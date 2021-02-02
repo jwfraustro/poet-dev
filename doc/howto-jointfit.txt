@@ -1,0 +1,87 @@
+HOW TO JOINT FIT:
+=================
+
+2016-06-14 kmcin   kmcintyre@knights.ucf.edu
+
+This is a guide to joint fit multiple channels in POET.
+
+I’ll be using HAT-P-16b as an example - replace with your relevant EVENTNAME, POET runs, and usernames/dates.
+
+
+1.- Create a new directory under your planet’s event for the joint fit:
+cd /home/esp01/events/hat-p-16b
+mkdir ha016bs-kmcin-joint-test
+
+
+2.- Copy POET to the joint fit directory:
+git clone /home/esp01/git/poet.git /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/
+
+
+3.- Create a centering directory under the POET run directory:
+cd run
+mkdir centering
+
+
+4.- Create an aperture directory under the centering directory:
+cd centering
+mkdir ap
+
+
+5.- Copy *_p5c.dat to the ap directory from your final POET run directory, one for each channel:
+cd ap
+cp /home/esp01/events/hat-p-16b/ha016bs11-kmcin/2016-04-05/run/fgc/ap3500715/ha016bs11_p5c.dat /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/
+
+cp /home/esp01/events/hat-p-16b/ha016bs21-kmcin/2016-04-05/run/fgc/ap3000715/ha016bs21_p5c.dat /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/
+
+
+6.- Copy *_pht.dat to the ap directory from your final POET run directory, one for each channel:
+cd ap
+cp /home/esp01/events/hat-p-16b/ha016bs11-kmcin/2016-04-05/run/fgc/ap3500715/ha016bs11_pht.dat /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/
+
+cp /home/esp01/events/hat-p-16b/ha016bs21-kmcin/2016-04-05/run/fgc/ap3000715/ha016bs21_pht.dat /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/
+
+7.- Copy one run into a new directory, pipeline:
+#Create pipeline directory
+cd ap
+mkdir DATE-pipeline
+
+#Copy results from running lcmodel.py
+cd DATE-pipeline
+cp /home/esp01/events/hat-p-16b/ha016bs21-kmcin/2016-04-05/run/fgc/ap3000715/2016-04-11-1e5-all-model/* /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/DATE-pipeline/
+
+#Remove sdnr-compare directory (NOTE: rm -rf is always dangerous)
+cd DATE-pipeline
+rm -rf 2016-04-11-1e5-all-sdnr-compare
+
+
+8.- Copy files to the ancil directory (which should be now in the DATE-pipeline directory from step 7):
+cd ancil
+
+#Should already have parameter files for the channel you copied the final run from, now need to copy *params.py and *-initvals.txt for remaining channels.
+
+cp /home/esp01/events/hat-p-16b/ha016bs11-kmcin/2016-04-05/run/fgc/ap3500715/2016-04-14-1e5-model/ancil/* /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/DATE-pipeline/ancil/
+
+#Also copy eg00-initvals.txt and eg00params.py from the scripts directory
+cp /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint/poet/scripts/eg00* /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/DATE-pipeline/ancil/
+
+
+9.- Edit step sizes in *-initvals.txt for every channel other than 1 to make channel 1 “the boss”:
+cd ancil
+emacs ha016bs21-initvals.txt
+
+#Set stepsize[0] = -1.0000e+00
+     stepsize[1] = -2.0000e+00
+     stepsize[3] = -4.0000e+00
+     stepsize[4] = -4.0000e+00, 
+#Don't change the depth - independent for each channel
+
+10.- Now everything should be set up to run the joint fit:
+#Go back to DATE-pipeline directory
+cd /home/esp01/events/hat-p-16b/ha016bs-kmcin-joint-test/run/centering/ap/DATE-pipeline
+
+#Type the following into the command line to run joint fit:
+run.py p6 mode=full
+
+
+11.- A dated results directory should now be created under the DATE-pipeline directory containing the joint fit. 
+#Please let me know (kmcintyre@knights.ucf.edu) if you find any errors in this doc.

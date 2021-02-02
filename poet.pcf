@@ -1,0 +1,43 @@
+[POET]
+# the name of the run directory you would like to use
+rundir    run
+
+# the event-code of the observation (often the same as rundir, must be
+# the base name of the pcf file in the run directory)
+# If running a joint fit, this must match a pcf file. POET
+# will use the [p6] section of this file for the joint fit.
+eventname wa012bs12
+
+[EDGAR]
+# config for EDGAR to use.
+
+# the maximum memory to allot EDGAR
+memory  10240
+
+# the maximum number of CPUs to
+cores   10
+
+# Test centering and photometry. This centering and photometry will be used
+# to determine the best model.
+test_centering fgc
+test_photometry ap250+000
+
+# model sets for p6 to try. One line for each set of models
+p6model         mandelecl linramp bilinint
+                mandelecl quadramp bilinint
+                mandelecl bilinint
+
+# set True to run p6 automatically after running p1-5 (setting to False will automatically skip p7-10)
+runp6     True
+
+# set True to run p7-10 automatically after running p6
+runp7_10 True
+
+# set True to run ZEN
+runzen    True
+
+# models for ZEN to run (will not affect p6)
+zenmodels pld mandelecl
+          pld mandelecl linramp
+          pld mandelecl quadramp
+

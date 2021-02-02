@@ -1,0 +1,988 @@
+  MODEL TYPES
+  -----------
+
+    Eclipse models
+    Ramp models
+    Polynomial intra-pixel models
+    Interpolated intra-pixel models
+    Position models
+    Visit sensitivity models
+    Flat field correction models
+  
+*************************************
+* ECLIPSE MODELS                    *
+*************************************
+
+*****  mandelecl / mandelecl2 / mandelecl3
+
+  This function computes the secondary eclipse shape using equations provided by Mandel & Agol (2002).
+  
+  Parameters
+  ----------
+    midpt:  Center of eclipse
+    width:  Eclipse duration from contacts 1 to 4
+    depth:  Eclipse depth
+    t12:    Eclipse duration from contacts 1 to 2
+    t34:    Eclipse duration from contacts 3 to 4
+    flux:   Flux offset from 0
+    t:	    Array of phase points
+
+  Returns
+  -------
+    This function returns the flux for each point in t.
+
+*****  mandeltr / mandeltr2
+  
+  This function computes the primary transit shape using equations provided by Mandel & Agol (2002)
+
+  Parameters
+  ----------
+    midpt:  Center of eclipse
+    rprs:   Planet radius / stellar radius
+    cosi:   Cosine of the inclination
+    ars:    Semi-major axis / stellar radius
+    flux:   Flux offset from 0
+    p:      Period in same units as t
+    t:	    Array of phase/time points
+
+  Returns
+  -------
+    This function returns the flux for each point in t.
+
+*****  trnlldsp / trnlldsp2
+
+  This function computes the primary transit shape using non-linear limb-darkening equations for a
+  "small planet" (rprs <= 0.1), as provided by Mandel & Agol (2002).
+
+  Parameters
+  ----------
+    midpt:  Center of eclipse
+    rprs:   Planet radius / stellar radius
+    cosi:   Cosine of the inclination
+    ars:    Semi-major axis / stellar radius
+    flux:   Flux offset from 0
+    c#:     Limb-darkening coefficients
+    t:	    Array of phase/time points
+    p:      Period in same units as t
+
+  Returns
+  -------
+    This function returns the flux for each point in t.
+
+*****  eccorbit / eccorbitv
+
+  This function computes the primary transit and secondary eclipse shapes using
+  non-linear limb-darkening equations for a "small planet" (rprs <= 0.1).
+  Assume constant (but different) transit and eclipse velocities.
+
+  Parameters
+  ----------
+    midpt:  Center of transit
+    rprs:   Planet radius / stellar radius
+    cosi:   Cosine of the inclination
+    ars:    Semi-major axis / stellar radius
+    esinw:  Eccentricity*sin(argument of periastron)
+    ecosw:  Eccentricity*cos(argument of periastron)
+    depth:  Secondary eclipse depth
+    flux:   Flux offset from 0
+    p:      Period in same units as t
+    c#:     Limb-darkening coefficients
+    t:	    Array of phase/time points
+
+  Returns
+  -------
+    This function returns the flux for each point in t.
+
+*****  mandel_geom
+
+  This function computes a transit shape using equations provided by Mandel & Agol (2002).
+
+  Parameters
+  ----------
+    midpt:  Center of eclipse
+    width:  Eclipse duration from contacts 1 to 4
+    rp_rs:  Planet-star radius ratio
+    b:	    Impact parameter
+    flux:   Stellar flux
+    x:	    Array of phase points
+
+  Returns
+  -------
+    This function returns the flux for each point in x.
+ 
+*****  mandelecl_orbit
+
+  This function computes the transit shape using equations provided by Mandel & Agol (2002).
+
+  Parameters
+  ----------
+    midpt:  Center of eclipse
+    width:  Eclipse duration from contacts 1 to 4
+    rp_rs:  Planet-star radius ratio
+    b:	    Impact parameter
+    flux:   Stellar flux
+    x:	    Array of phase points
+
+  Returns
+  -------
+    This function returns the flux for each point in x.
+
+*************************************
+*  RAMP MODELS                      *
+*************************************
+
+*****  orthoInvtrans
+
+    This function uses principal component analysis to modify parameter values.
+
+    Parameters
+    ----------
+    params:     Array of parameters to be modified
+    invtrans:   Inverse transformation matrix, np.matrix() type
+    origin:	    Array of len(params) indicating the reference frame origin
+
+    Returns
+    -------
+    This function returns the modified parameter values
+
+*****  orthoTrans
+
+    This function uses principal component analysis to modify parameter values.
+
+    Parameters
+    ----------
+    params:     Array of params to be modified, length is npars for 1D
+                If 2D, shape is npars x nsteps
+    invtrans:   Inverse transformation matrix, np.matrix() type, shape is npars x npars
+    origin:     Array of length npars indicating the reference frame origin
+    sigma:      Array of length npars indicating the uncertainties
+
+    Returns
+    -------
+    This function returns the modified parameter values of shape params
+
+****  pcaInvtrans
+
+    This function uses principal component analysis to modify parameter values.
+
+    Parameters
+    ----------
+    params:     Array of parameters to be modified
+    invtrans:   Inverse transformation matrix, np.matrix() type
+    origin:	    Array of len(params) indicating the reference frame origin
+
+    Returns
+    -------
+    This function returns the modified parameter values
+
+*****  pcaramp / pcaramp2
+
+    This function creates a model that fits a ramp using a principal component analysis.
+
+    Parameters
+    ----------
+    goal:  goal as t -> inf
+    r0:	   curvature
+    r1:	   time offset * curvature
+    t:	   Array of time/phase points
+
+    Returns
+    -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+    Equation
+    --------
+      goal + pm*exp(-r0*t + r1)
+      goal*(1 + pm*exp(-r0*t + r1))
+    
+
+*****  fallingexp
+
+  This function creates a model that fits a ramp using a falling exponential.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    m:	   rise exp
+    x0:	   time offset
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal * (1 + exp(-m * (x - x0)))
+
+*****  felramp
+
+  This function creates a model that fits a ramp using a falling exponential + linear.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    m:	   rise exp
+    x0:	   time offset
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal * (1 + exp(-m * (t - t0)))+ a*(t-t1)
+
+*****  risingexp
+
+  This function creates a model that fits a ramp using a rising exponential.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    m:	   rise exp
+    x0:	   time offset
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    
+
+*****  seramp
+
+  This function creates a model that fits a ramp using a rising exponential.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    pm:	   plus or minus 1 (+1: fallingexp, -1: risingexp)	
+    r#:    ramp parameter
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    
+
+*****  selramp
+
+ This function creates a model that fits a ramp using a rising exponential + linear.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    pm:	   plus or minus 1 (+1: fallingexp, -1: risingexp)	
+    r#:    ramp parameter
+    x0:	   time offset
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal + pm*exp(-r0*x + r1) + r2*(x-x0)
+
+*****  seqramp
+
+  This function creates a model that fits a ramp using a rising exponential + quadratic.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    pm:	   plus or minus 1 (+1: fallingexp, -1: risingexp)	
+    r#:    ramp parameter
+    x0:	   time offset
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal + pm*exp(-r0*x + r1) + r2*(x-x0) + r3*(x-x0)**2
+
+*****  se2ramp
+
+  This function creates a model that fits a ramp using a double rising exponential.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    pm#:   plus or minus 1 (+1: fallingexp, -1: risingexp)	
+    r#:    ramp parameter
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal + pm0*exp(-r0*x+r1) + pm1*exp(-r4*x+r5)
+
+*****  reramp2
+
+  This function creates a model that fits a ramp using a rising exponential.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    a:	   x constant
+    b:	   constant
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal*(1 - exp(-a*x + b))
+
+*****  expramp
+
+  This function creates a model that fits a ramp using a rising exponential.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    a:	   constant
+    m:	   rise exp
+    t:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal - a*exp(-m*t)
+
+*****  re2ramp
+
+  This function creates a model that fits a ramp using a double rising exponential.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    a:     constant
+    b:     constant
+    m1,m2: rise exp
+    t1,t2: time offset
+    t:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal - a*exp(-m1*(t - t1)) - b*exp(-m2*(t - t2))
+
+*****  reqramp
+
+  This function creates a model that fits a ramp using a rising exponential + quadratic.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    a:     constant
+    b:     constant
+    c:     x=0 offset
+    m:	   rise exp
+    x0:	   time offset
+    x1:    phase offset for polynomial
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal*(1 - exp(-m*(x - x0))) + a*(x-x1)**2 + b*(x-x1) + c
+
+*****  relramp
+
+  This function creates a model that fits a ramp using a rising exponential + linear.
+
+  Parameters
+  ----------
+    goal:  goal as x -> inf
+    a:     constant
+    b:     x=0 offset
+    m:	   rise exp
+    x0:	   time offset
+    x1:    phase offset for polynomial
+    x:	   Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a rising exponential
+
+  Equation
+  --------
+    goal*(1 - exp(-m*(x - x0))) + a*(x-x1) + b
+
+*****  quadramp
+
+  This function creates a model that fits a ramp using a quadratic polynomial.
+
+  Parameters
+  ----------
+    midpt:  Midpoint of eclipse
+    width:  Eclipse durations
+    depth:  Depth of eclipse
+    a:	    x^2 constant
+    b:	    x constant
+    c:	    x=0 offset
+    x0:     time/phase offset (constant)
+    x:	    Array of time/phase points
+
+  Returns
+  -------
+    This function returns an array of y values by combining an eclipse and a quadratic
+
+  Equation
+  --------
+    a*(x-x0)**2 + b*(x-x0) + c
+
+*****  linramp
+
+  This function creates a model that fits a ramp using a linear polynomial.
+
+  Parameters
+  ----------
+    x0: time offset
+    a: coefficient of first term
+    b: constant
+    x: Array of time/phase points
+
+  Returns
+  -------
+    This function returns the flux values for the ramp models 
+
+  Equation
+  --------
+    a*(x-x0) + b
+
+*****  logramp
+
+  This function creates a model that fits a ramp using a 4th-order natural log polynomial.
+
+  Parameters
+  ----------
+    x0:	time offset
+    b:	x constant
+    c:	x=0 offset
+    x:	Array of time/phase points
+
+  Returns
+  -------
+    This function returns the flux values for the ramp models
+
+  Equation
+  --------
+    a*log(xnew-x0)**4 + b*log(xnew-x0)**3 + c*log(xnew-x0)**2 + d*log(xnew-x0) + e
+
+*****  llramp
+
+  This function creates a model that fits a ramp using a log + linear ploynomial.
+
+  Parameters
+  ----------
+    x0: phase offset for log term
+    a:  log(x) constant
+    b:  x constant
+    c:  x=0 offset
+    x1: phase offset for polynomial
+    x:  Array of time/phase points
+
+  Returns
+  -------
+    This function returns the flux values for the ramp models
+
+  Equation
+  --------
+    a*log(xnew-x0) + b*(xnew-x1) + c
+
+*****  lqramp
+
+  This function creates a model that fits a ramp using a log + quadratic ploynomial.
+
+  Parameters
+  ----------
+    x0: phrase offset for log term
+    a:	log(x) term
+    b:	quadratic term
+    c:	linear term
+    d:  constant term
+    x1: phase offset for polynomial
+    x:	Array of time/phase points
+
+  Returns
+  -------
+    This function returns the flux values for the ramp models
+
+  Equation
+  --------
+    a*log(xnew-x0) + b*(xnew-x1)**2 + c*(xnew-x1) + d
+
+*****  log4qramp
+
+  This function creates a model that fits a ramp using quartic-log + quadratic polynomial.
+
+  Parameters
+  ----------
+    x0: phase offset for log
+    a:	log(x)^4 term
+    b:	log(x)^3 term
+    c:	log(x)^2 term
+    d:	log(x) term
+    e:	quadratic term
+    f:	linear term
+    g:  constant term
+    x1: phase offset for polynomial
+    x:	Array of time/phase points
+
+  Returns
+  -------
+    This function returns the flux values for the ramp models
+
+  Equation
+  --------
+    a*log(xnew-x0)**4 + b*log(xnew-x0)**3 + c*log(xnew-x0)**2 + d*log(xnew-x0) + e*(xnew-x1)**2 + f*(xnew-x1) + g
+
+***** sindecay
+
+  This function creates a model that fits a sinusoidal decay.
+
+  Parameters
+  ----------
+    x0: phase/time offset
+    a:	amplitude
+    b:	exponential constant
+    c:	period
+    d:  vertical offset
+    x:	Array of time/phase points
+
+  Returns
+  -------
+	This function returns an array of y values.
+
+  Equation
+  --------
+    a*exp(b*x)*cos(2*pi*(x-x0)/c) + d
+
+*****  sincos
+
+  This function creates a model that fits a sinusoid.
+
+  Parameters
+  ----------
+    a/b:    amplitude
+    p1/p2:	period
+    t1/t2:  phase/time offset
+    c:      vertical offset
+    t:	    Array of time/phase points
+
+  Returns
+  -------
+	This function returns an array of y values.
+
+  Equation
+  --------
+    a*sin(2*pi*(t-t1)/p1) + b*cos(2*pi*(t-t2)/p2) + c
+
+
+*************************************
+*  POLYNOMIAL INTRA-PIXEL MODELS    *
+*************************************
+
+***** linip
+
+  This function creates a model that fits the median flux at each mosition
+
+  Parameters
+  ----------
+    ipparams:   Intrapixel parameters at each position
+    nobj:       Number of points
+    wherepos:	Array of position point locations
+
+  Returns
+  -------
+    This function returns an array of y values.
+
+*****  quadip
+
+  This function fits the intra-pixel sensitivity effect using a 2D quadratic.
+
+  Parameters
+  ----------
+    a: quadratic coefficient in y
+    b: quadratic coefficient in x
+    c: coefficient for cross-term
+    d: linear coefficient in y
+    e: linear coefficient in x
+    f: constant
+
+  Returns
+  -------
+    returns the flux values for the intra-pixel model
+
+*****  quadip4
+
+  This function fits the intra-pixel sensitivity effect using a 2D quadratic in each pixel quadrant.
+
+  Parameters
+  ----------
+    a#: quadratic coefficient in y
+    b#: quadratic coefficient in x
+    c#: coefficient for cross-term 
+    d#: linear coefficient in y
+    e#: linear coefficient in x
+    f#: constant
+    *0: first quadrant
+    *1: second quadrant
+    *2: third quadrant
+    *3: fourth quadrant
+ 
+  Returns
+  -------
+    returns the flux values for the intra-pixel model
+
+*****  cubicip
+
+  This function fits the intra-pixel sensitivity effect using a 2D cubic.
+
+  Parameters
+  ----------
+    a: cubic coefficient in y
+    b: cubic coefficient in x
+    c: coefficient of cross-term xy^2
+    d: coefficient of cross-term yx^2
+    e: quadratic coefficient in y
+    f: quadratic coefficient in x
+    g: coefficient of cross-term xy
+    h: linear coefficient in y
+    i: linear coefficient in x
+    j: constant
+
+  Returns
+  -------
+    returns the flux values for the intra-pixel model
+
+*****  sexticip
+
+  This function fits the intra-pixel sensitivity effect using a 2D 6th-order polynomial.
+
+  Parameters
+  ----------
+    x#:  #-ordered coefficient in x
+    y#:  #-ordered coefficient in y
+    c:   constant
+
+  Returns
+  -------
+    returns the flux values for the intra-pixel model
+
+*****  sexticipc
+
+  This function fits the intra-pixel sensitivity effect using a 2D 6th-order polynomial, with cross terms.
+
+  Parameters
+  ----------
+    y#:  #-ordered coefficient in y
+    x#:  #-ordered coefficient in x
+    y2x: cofficient for cross-term xy^2
+    x2y: coefficient for cross-term yx^2
+    xy:  coefficient for cross-term xy
+  
+  Returns
+  -------
+    returns the flux values for the intra-pixel model
+
+***** ballardip
+
+    This function fits the intra-pixel sensitivity effect using the method described by Ballard et al. (2010).
+
+    Parameters
+    ----------
+	ipparams :  tuple
+                unused
+    y :         1D array, size = # of measurements
+                Pixel position along y
+    x :         1D array, size = # of measurements
+                Pixel position along x
+    flux :      1D array, size = # of measurements
+                Observed flux at each position
+    
+    Returns
+    -------
+    weight :    1D array, size = # of measurements
+                Normalized intrapixel-corrected flux multiplier
+
+
+*************************************
+* INTERPOLATIVE INTRA-PIXEL MODELS  *
+*************************************
+
+*****  medianip
+
+  This function fits the intra-pixel sensitivity effect using the median within a given radius of the current position.
+
+  Parameters
+  ----------
+    ipparams :  tuple
+                unused
+    y :         1D array, size = # of measurements
+                Pixel position along y
+    x :         1D array, size = # of measurements
+                Pixel position along x
+    flux :      1D array, size = # of measurements
+                Observed flux at each position
+    wherebinflux :  1D array, size = # of bins	
+	
+  Returns
+  -------
+    1D array, size = # of measurements
+    Intra-pixel-corrected flux multiplier
+
+*****  nnint
+
+  This function fits the intra-pixel sensitivity effect using the mean within a given binned position (nearest-neighbor interpolation).
+
+  Parameters
+  ----------
+    ipparams :  tuple
+                unused
+    y :         1D array, size = # of measurements
+                Pixel position along y
+    x :         1D array, size = # of measurements
+                Pixel position along x
+    flux :      1D array, size = # of measurements
+                Observed flux at each position
+    wherebinflux :  1D array, size = # of bins
+                    Measurement number assigned to each bin
+    gridpt :    1D array, size = # of measurements	
+	
+  Returns
+  -------
+    1D array, size = # of measurements
+    Normalized intrapixel-corrected flux multiplier	
+
+***** bilinit
+
+    This function fits the intra-pixel sensitivity effect using bilinear interpolation to fit mean binned flux vs position.  
+
+    Parameters
+    ----------
+	ipparams :  tuple
+                unused
+    y :         1D array, size = # of measurements
+                Pixel position along y
+    x :         1D array, size = # of measurements
+                Pixel position along x
+    flux :      1D array, size = # of measurements
+                Observed flux at each position
+    wherebinflux :  1D array, size = # of bins
+                    Measurement number assigned to each bin
+    gridpt :    1D array, size = # of measurements
+                Bin number in which each measurement is assigned
+    dy1 :       1D array, size = # of measurements
+                (y - y1)/(y2 - y1)
+    dy2 :       1D array, size = # of measurements
+                (y2 - y)/(y2 - y1)
+    dx1 :       1D array, size = # of measurements
+                (x - x1)/(x2 - x1)
+    dx2 :       1D array, size = # of measurements
+                (x2 - x)/(x2 - x1)
+    ysize :     int
+                Number of bins along y direction
+    xsize :     int
+                Number of bins along x direction
+    smoothing:  boolean
+                Turns smoothing on/off
+    
+    Returns
+    -------
+    output :    1D array, size = # of measurements
+                Normalized intrapixel-corrected flux multiplier
+
+    Optional
+    --------
+    binflux :   1D array, size = # of bins
+                Binned Flux values
+
+    Notes
+    -----
+    When there are insufficient points for bilinear interpolation, nearest-neighbor interpolation is used.  The code that handles this is in p6models.py.
+
+*****  fixipmapping
+
+    This function returns the fixed best-fit intra-pixel mapping.
+
+    Parameters
+    ----------
+	ipparams :  tuple
+                unused
+    bestmip :   1D array, size = # of measurements
+                Best-fit ip mapping
+    
+    Returns
+    -------
+    output :    1D array, size = # of measurements
+                Intra-pixel-corrected flux multiplier
+
+*****  ipspline
+
+  This function fits the intra-pixel sensitivity effect using a bicubic spline.
+
+  Parameters
+  ----------
+    k#:   Knot coefficient
+    x,y:  Array of x,y pixel positions and quadrant locations
+    etx:  Knot locations
+
+  Returns
+  -------
+    This function returns an array of y values.
+
+
+
+  POSITION MODELS
+  ---------------
+
+***** posflux
+
+  This function creates a model that fits the median flux at each position
+
+  Parameters
+  ----------
+    posparams:  Position parameters
+    nobj:       Number of points
+    wherepos:	Array of position point locations
+
+  Returns
+  -------
+    This function returns an array of y values.
+
+*****  posflux2
+
+  This function creates a model that fits the flux at each position
+
+  Parameters
+  ----------
+    posparams:  Position parameters
+    nobj:       Number of points
+    wherepos:	Array of position point locations
+
+  Returns
+  -------
+    This function returns an array of y values.
+
+*****  posfluxlinip
+
+ This function creates a model that fits the median flux at each mosition
+
+  Parameters
+  ----------
+    posparams:  Position parameters
+    nobj:       Number of points
+    wherepos:	Array of position point locations
+
+  Returns
+  -------
+    This function returns an array of y values.
+
+*****  posflixlinip2
+
+  This function creates a model that fits the median flux at each mosition
+
+  Parameters
+  ----------
+    posparams:  Position parameters
+    nobj:       Number of points
+    wherepos:	Array of position point locations
+
+  Returns
+  -------
+    This function returns an array of y values.
+
+
+*************************************
+* VISIT SENSITIVITY MODELS          *
+*************************************
+
+*****  vsll
+
+  This function creates a model that fits the visit sensitivity.
+
+  Parameters
+  ----------
+    p#:    position #
+    x:	   Array of frame numbers in current visit
+    knots: Not required for this function
+
+  Returns
+  -------
+    This function returns an array of y values...
+
+*****  vissen
+
+  This function creates a model that fits the visit sensitivity.
+
+ Referecnes:
+  See SI from Harrinton et al. (2007)
+
+*****  vsspline
+
+  This function creates a cubic spline that fits the visit sensitivity.
+
+  Parameters
+  ----------
+    k#:     knot coefficient
+    x:      Array of frame numbers in current visit
+    knots:  knot locations
+
+  Returns
+  -------
+    This function returns an array of y values...
+
+*************************************
+* FLAT-FIELD CORRECTION MODELS      *
+*************************************
+
+*****  flatfield
+
+  This function perform flat field correction on a n-by-n pixel aperture.
+
+  Parameters
+  ----------
+    ff#:    Flux modifier, starting with upper left pixel, reads normally (shape = n*n or n,n)
+    flux:   Array of flux values (shape = #images)
+    ap:     3D array of flux values within the aperture (shape = n,n,#images)
+
+  Returns
+  -------
+    This function returns an array of new flux values.
+
+  Notes
+  -----
+    Apertures for each image must be the same size as ffparams. (ap[0].size=ffparams.size)
+
+  References
+  ----------
+    See SI from Harrinton et al. (2007)
+

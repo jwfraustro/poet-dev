@@ -1,0 +1,39 @@
+# Currently this file follows a very specific format
+# Comments are allowed, but only one separate lines, with
+# the comment character as the very first character.
+# Lines are read as single entries, so spaces are allowed
+# The 'end' at the bottom of the files tells the reader
+# that it has reached the end of the file. This can certainly
+# be improved, but it works for now.
+# There must be a blank line between each list, so that the
+# reader knows when it has read the final item for that list.
+papername
+PLD and BLISS Applied to WASP-29b Eclipses
+
+authors
+Ryan C. Challener
+Joseph Harrington
+Patricio E. Cubillos
+Jasmina Blecic
+Drake Deming
+Coel Hellier
+
+month
+Nov
+
+year
+2017
+
+journal
+ApJ
+
+instruments
+Infrared Array Camera
+
+programs
+60003
+70084
+10054
+
+
+end

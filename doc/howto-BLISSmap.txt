@@ -1,0 +1,48 @@
+How to BLISS map:
+=================
+
+2016-06-21 garland zabblleon@knights.ucf.edu
+
+1. Ensure you've picked the best combination of models via SDNR and BIC. Centering, ramp
+   models, and apertures. Do joint fitting, if planned, as well.
+
+2. Using your best run's eg00params.py and eg00-initvals.txt files, set up a new p6 run.
+   Leave all parameters and initial values the same except for the following alterations:
+
+   	- Add another model fit to your p.model list in eg00params.py. Leave the eclipse and ramp
+          models the same as your best run, but change the intrapixel model to nearest neighbor as follows:
+	  
+	  	p.model = [['mandelecl', 'linramp', 'bilinint'], # Original best run
+                           ['mandelecl', 'linramp', 'nnint']]    # New, nearest neighbor run
+	
+	- Further down the eg00params.py file, note the following lines:
+		
+		p.xstep      = [0.01]                     #Bin size in x
+    		p.ystep      = [0.01]                     #Bin size in y 
+		p.minnumpts  = [1]                        #Minimum # of points in a bin
+
+	  These parameters are used to control the bin size used during BLISS mapping.
+          They will be the parameters we change while finding our best BLISS map. Leave these at their
+          defaults for now. 
+
+3. Run p6 and view the results file for both model fits. Your goal is to find the lowest bin size in x and y,
+   p.xstep and p.ystep, where the 'bilinint' model has a lower BIC than the 'nnint' model.
+   Rerun p6 repeatedly, lowering p.xstep and p.ystep by small amounts until the 'nnint' model
+   outperforms the 'bilinint' model. The bin size does not have to be square; p.xstep is not necessarily
+   equal to p.ystep. 
+
+4. Once you've found the lowest bin sizes for your model, increase p.minnumpts from the default of 1 to 5.
+   If the 'bilinint' model still has the lowest BIC, you've most likely found an optimal BLISS map. If not,
+   slightly raise your bin sizes and try again. Your final BLISS map should have a p.minnumpoints of 5 or higher.
+
+5. Ensure the BLISS map passes the "does it make sense" check: look at the plot in your results directory showing
+   the BLISS map sensitivity (fig6028 in the current pipeline). Does it have relatively smooth transitions between
+   sensitivities? Is it *not* highly granulated? Only small, contiguous areas of extreme variation from normal sensitivity? 
+   If so, the BLISS map is most likely accurate, if not further testing of bin sizes and minnumpts may be needed.
+
+6. Once you have your best BLISS map, rerun all centering, aperture, and ramp combinations again with your new
+   p.xstep, p.ystep, and p.minnumpts values using 'bilinint'. This ensures that BLISS mapping hasn't changed
+   your best model fit combination. If your best model is the same as before, you are ready to move on to p7 and beyond.
+   If your best model has changed, BLISS mapping may have either revealed a better fit or worsened your best fit. Further
+   BLISS map testing in your new best combinations is needed before a final fit can be achieved.
+

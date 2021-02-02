@@ -1,0 +1,18 @@
+name: poet
+channels:
+  - http://ssb.stsci.edu/astroconda
+  - conda-forge
+dependencies:
+  - python
+  - numpy
+  - matplotlib
+  - scipy
+  - astropy
+  - pip
+  - configparser
+  - h5py
+  - numexpr
+  - pynfft
+  - pywavelets
+  - scikit-learn
+  

@@ -1,0 +1,414 @@
+By: Justin Garland
+Last Revision: 2014-05-14
+mods by jh, 2016-11-30
+
+------------------------------------------------------------------------------------
+p1-p5
+------------------------------------------------------------------------------------
+
+1.) Create events directories
+
+You'll want to create a folder for your planet analysis in the
+ 
+/home/esp01/events
+
+directory. This is where your run(s) will take place. For clarity and uniformity,
+follow a naming convention similar to this example:
+
+PLANETNAME = 'surveyname-planet-yourusername'
+e.g., 'wasp-32b-garland'
+
+cd /home/esp01/events/
+mkdir PLANETNAME
+
+Then, make folders for each Spitzer channel you have data for. You can see how many
+you'll need by looking up the location of your planet's raw data in:
+
+/home/esp01/data
+
+Event codes are formatted as follows:
+
+<two letter survey code><three number star code><planet letter><type of eclipse><channel number><visit number>
+Survey codes: WASP - wa, TrES - tr, HAT - ha, HD - hd, GJ - gj
+Type of eclipse: p - primary, s - secondary, o - orbit
+
+For example, WASP32-b's is (in the first channel) wa032bs11.
+
+Some singletons have different star names, like proxbp11.
+
+Each folder in the data directory with your planet code is data for a different channel. For 
+example WASP32b has data in the first and second channels:
+
+/home/esp01/data/2010-Spitzer-too/wa032bs11
+/home/esp01/data/2010-Spitzer-too/wa032bs21
+
+So, make a folder for each channel following event code conventions. Here's how I'd do it for
+WASP32-b:
+
+cd /home/esp01/events/wasp-32b-garland
+mkdir wa032bs11
+mkdir wa032bs21
+
+
+
+2.) Pull POET from repo
+
+From here we deal with only one channel. In one of your channel directories do the command:
+
+mkdir DATE
+
+where DATE is today's date in yyyy-mm-dd format. This allows you to keep track of different runs on
+different days and keeps the directories in chonological order.
+
+Then do:
+
+cd /home/esp01/events/PLANETNAME/EVENTNAME/DATE/
+git clone /home/esp01/git/poet.git DATE
+
+With your directory names. This should copy the latest version of POET into your DATE directory.
+
+
+
+3.) eventname.pcf
+
+We need to edit variables used by the first half of the pipeline in a few files, first being
+eventname.pcf. It (and the others) are in the run directory that git just created. You can get
+there easily using:
+
+cd /home/esp01/events/PLANETNAME/EVENTNAME/DATE/run
+
+IMPORTANT. Rename eventname.pcf to EVENTNAME.pcf, following what you did above. POET will throw an error if you don't.
+
+Open up the file now called EVENTNAME.pcf. I'll go through those variables that need explaining:
+
+tepfile:
+Transiting Extrasolar Planet file for your planet. They can be found under
+
+/home/esp01/obsprep/TEP
+
+You should look for the one with your planet name. If it isn't there, it needs to be made and you
+should look into doing that with the workflow in the file
+
+/home/esp01/doc/README_TEPfiles
+
+
+datadir:
+Remember the data directory we looked at earlier? This is that data directory for the channel you're
+looking at. For example, mine for WASP32-b is:
+
+data/2010-Spitzer-too/wa032bs11
+
+This is always relative to /home/esp01 unless you change the topdir at the bottom of your
+EVENTNAME.pcf file.
+
+
+sscver:
+This is the name of the directory inside the data directory for your 
+planet and channel.
+
+e.g., S18.18.0 for my data directory above in datadir.
+
+
+aorname and aortype:
+This one is slightly tricky. Though it says to put as many as there are and has 
+numbers possible for calibration data, we don't put anything here besides the data.
+Inside the sscver directory we talked about above in sscver, there should be directories
+with long, mostly numerical names. We need to check inside these to see which contain the
+data. Look in each and check how many files are in the bcd directory. Pick the directories that
+contain a lot more files in their bcd directory than the other(s).
+Then set aorname to the name of the directory you picked without the letter, in order of the images (they may not be sequential).  This shell command lists them in order:
+
+fitsgrep MJD_OBS */ch?/bcd/SPITZER_I?_*_0000_0000_1_bcd.fits | sort -n -k 4 | awk -F/ '{print $1}' | sed 's/r//'
+
+You can tell calibration AORs by looking at the star's position:
+
+fitsgrep RA */ch?/bcd/SPITZER_I?_*_0000_0000_1_bcd.fits 
+
+The calibration AORs will move the telescope a bit from the nominal position.  They are also either first, last, or both.  They have -sta, -co, and -ci extensions in the target and AORLABEL:
+
+fitsgrep AORLABEL */ch?/bcd/SPITZER_I?_*_0000_0000_1_bcd.fits
+
+If it's an IER, they will replace the AORLABEL with their own, but usually they don't change the calibration AORs into IERs.
+
+Example:
+
+WASP32-b has 2 directories. Opening each of their respective bcd directories gives us
+r39445248/ch1/bcd ~ 80 files
+r39447808/ch1/bcd ~ 14000 files
+Obviously the second directory is our data directory so we set the values of aorname and aortype as:
+
+aorname      39447808  
+aortype      0  
+
+
+pmaskfile:
+This is found in the data directory for your channel (where we saw the directory
+bcd before) in the cal directory. Look for a .fits file with a name like
+
+<something>_pmask.fits
+
+
+kuruczfile:
+This is found in the directory
+/home/esp01/ancil/kurucz
+Pick the file with your planet's name in it. If you can't find it in this directory,
+check in the subdirectory full-list and copy your file over to the kurucz directory.
+If you still can't find it, one hasn't been made fore your planet yet and you'll need to
+retrieve it. Instructions for this can be found under 
+
+/home/esp01/doc/info_kurucz
+
+
+psffile:
+This should be left as default as long as you are in channels 1-4 (IRAC).
+If it isn't IRAC data, you can look under the cal directory mentioned above for one.
+
+runp2 and runp3:
+Should be set to True unless you don't want to run POET as one command.  On your initial runs, run one step at a time so you can find where errors occur more easily.
+
+
+If the RA and DEC in the TEP file (usually given in J2000.0) do not
+match what is in the header (position of observation date), then the
+initial guess for the stellar position will be wrong, and POET will
+break, badly if the guess is off the frame.  This can happen if proper
+motion is large.  Override the RA and DEC at the end of the event
+file.  Use hh:mm:ss.sss and ddd:mm:ss.sss format.  Find it by looking
+at an image with DS9, centering on the star, and reading the RA and
+DEC out of the display.
+
+
+4.) center.pcf
+
+This controls how p3 does centering. For a simple run most variables should be fine but
+runp4 should be True if you want to run POET in one go.
+If you would like to run more than one type of centering in one run, you can give more
+than one value for method and a run will be done on each as follows:
+
+method     fgc col lag
+
+You can run multiple runs with ANY variable changed using @ signs. Copy the whole contents
+of center.pcf and paste after the body of the text. You can then change variables in this 
+new block of text and it will do seperate runs based on each block. Example:
+
+@
+method     fgc     # Choose:  fgc: Fit gauss function.
+...
+# Background fit: 0: No fit (use median); 1: Fit a constant; 2: Fit a plane.
+fitbg       1
+...
+nopsfctr    False  # Do Not do centering on the PSF. If True the PSF center 
+                   # will be center of the PSF_frame
+
+@
+method     fgc     # Choose:  fgc: Fit gauss function.
+...
+# Background fit: 0: No fit (use median); 1: Fit a constant; 2: Fit a plane.
+fitbg       0
+...
+nopsfctr    False  # Do Not do centering on the PSF. If True the PSF center 
+                   # will be center of the PSF_frame
+
+This would do two seperate centerings with different methods of fitting the background.
+WARNING! ccores defines the number of cores used by each run in multithreading. If
+you do a large amount runs with the default 3 cores, it'll slow down the computer and 
+make it hard for others to use it!
+
+
+
+5.) photom.pcf
+
+This file controls parameters used in photometry. Most variables can be left as is
+but this is the file you use to change your apertures.
+photap is your photometry apertures, separated by spaces. start with a middle aperture around
+3.5, or do them at 2.0, 3.0, 4.0, 5.0.  For the full
+run, start at 1.75 and go to 5.00 in increments of 0.25. From this you can determine which aperture gives you the
+best results and focus on that one in p6. 
+Ensure your skyout will not leave the image or include other stars! You can do this by
+using ds9 to view a .fits files in your dataset and counting how far away the nearest
+obstacle is. For example, I could use the following lines to ds9 a .fits for WASP32-b:
+
+cd /home/esp01/data/2010-Spitzer-too/wa032bs11/S18.18.0/r39447808/ch1/bcd
+ds9 SPITZER_I1_39447808_0000_0000_1_bcd.fits
+
+If you don't know which is your star in the image, go online to the Spitzer Heritage
+Archive (sha.ipac.caltech.edu/applications/Spitzer/SHA/) and search for your planet name.
+Highlight the AOR corresponding to the channel you're currently working on (without the -co)
+and click on the AOR Footprint tab on the right. The blue circled star is the one with your 
+exoplanet. The additional information on the first tab will also have your aorname for
+EVENTNAME.pcf if you couldn't find it earlier.
+You'll want to set runp5 to True if you want to run POET in one go.
+
+You can multithread photom.pcf as well! photap, skyin, and skyout work like method in
+center.pcf in that you can provide them multiple values.
+
+photap      2.0 2.25 5.00      # Photometry aperture radius
+skyin       7.0 8.0            # Inner sky annulus radius
+skyout     15.0 16.0           # Outer sky annulus radius
+
+This will do 12 runs with all combinations of these values. 
+You can also do the "block" method of multithreading described above in the center.pcf
+section to change any variable in photom.pcf.
+WARNING! ncores defines the number of cores used by each run in multithreading. If
+you do a large amount runs with the default 3 cores, it'll slow down the computer and 
+make it hard for others to use it!
+
+
+
+6.) RUN
+
+If you've been setting variables as described above all run<step> lines should be true.
+If this is the case, use the commands:
+
+cd /home/esp01/events/PLANETNAME/CHANNEL/DATE/run
+poet.py p1
+
+This should run POET in its entirety.
+
+If you'd like to go step by step, the following commands work:
+
+cd /home/esp01/events/PLANETNAME/CHANNEL/DATE/run
+poet.py p1
+poet.py p2
+poet.py p3
+poet.py p4 centerdir
+poet.py p5 centerdir/photomdir
+
+Where centerdir is the subdirectory in run created by the centering step p3 (name of the centering method used)
+and photomdir is the subdirectory in centerdir created by the photometry step p4 based on the
+apertures you picked (ap<three number photap><two number skyin><two number skyout>).
+
+If you centered the data in the past (already have a fgc-like directory) and would like to run
+a new aperture, or any other changes to the photometry, you don't have to run the whole thing
+again. You need to edit the photom.pcf file contained in the centerdir instead of the one in
+run. Then, as above, run the commands:
+
+poet.py p4 centerdir
+poet.py p5 centerdir/photomdir
+
+to do your new photometry. This will overwrite photometry done with the same parameters.
+
+------------------------------------------------------------------------------------
+p6
+------------------------------------------------------------------------------------
+
+There are two ways to run p6 for the first time. One method, 
+using an svn checkout into your aperture directory, works on only
+one aperture at a time. The other, using lcmodel.py, can be run on
+multiple apertures and centering methods at once.
+
+1.) lcmodel.py
+
+cd /home/esp01/events/PLANETNAME/CHANNEL/DATE/run
+
+To go to your run directory. Open the file named lcmodel.py.
+This is the file we'll execute in order to run p6 but we have to change some values in it first. This is the block of code you should
+change:
+
+centerdir = "all" #["fgc"] # "all" or list e.g.: ["fgc"]
+photdir   = "all" #["ap3000715"] # "all" # "all" #["ap1750715", "ap2250715"] # "all"  # "all" or list e.g.: ["ap2500715", "ap3000715"]
+repodir   = "yyyy-mm-dd-model"   # Name of git repository dir
+modeldir  = "yyyy-mm-dd-sdnr-compare"  # Name of p6 modeling dir
+eventname = "eg000bs11" # Name of your event (do not miss-spell it!)
+
+Change these variable as described below.
+
+centerdir:
+This is any centering directory you may have. Use "all" to run
+lcmodel.py on all centering directories you've made. Use the syntax
+["fgc", "col"] to run on specific centering directories only.
+
+photdir:
+These are the aperture directories you'd like to run p6 on. Like
+above, use "all" to run on all directories lcmodel.py finds. 
+Otherwise, list the directories in a similar fashion to how you listed
+your centering directories above. Note - you can use lcmodel on just
+one aperture by listing only one directory. This allows you to avoid
+using the svn checkout method of running p6, as lcmodel.py checks out
+the second half of the pipeline for you.
+
+repodir and modeldir:
+Simply the names of two directories made by lcmodel.py. You may
+rename them as you wish but the given format helps sort runs by date.
+
+eventname:
+Your EVENTNAME from above. For WASP-32b in the first channel it
+would be wa032bs11.
+
+Save and close lcmodel.py. Now do the following command (from the run directory) to open your scripts directory that was formed when you checked out POET.
+
+cd ../scripts/
+
+open eg00params.py. Edit the values to correspond to your event.
+Here are some that may need explination:
+
+p.modelfile:
+Must be EVENTNAME-initvals.txt. For WASP-32b this would be 
+wa032bs11-initvals.txt
+lcmodel.py breaks if this variable is not named correctly.
+
+p.model:
+The model sets you would like to test. I have not tried running
+multiple model sets using lcmodel.py so stick with one.
+
+p.priorvals and p.priorvars:
+Comment out both the lines that assign something to p.priorvars and
+p.priorvals.
+
+The other variables should be fine at their default values.
+
+Next open up eg00-initvals.txt. This is where you can edit the
+starting conditions for your model fitting. They should be fine at
+the defaults for a first run.
+
+Important! Do not rename eg00params.txt and eg00-initvals.txt in the
+scripts folder. This will break lcmodel.py. They will be renamed to
+EVENTNAMEparams.txt and EVENTNAME-initvals.txt by lcmodel.py and
+placed in each aperture directory you do a run for.
+
+All that is left is to return to your run directory and execute the
+line
+lcmodel.py
+in the command prompt. This should run p6 for all the POET directories
+you specified. In the plots directory you should find plots comparing
+SDNR and eclipse depth for each aperture size you tested, letting you
+easily compare them.
+
+2.) git pipeline
+
+If you would like to git and run the pipeline the old way, run the following lines from one of your aperture directories:
+
+mkdir pipeline
+svn co file:///home/esp01/svn/code/python/pipeline/trunk/ pipeline
+
+Then cd to the pipeline/ancil directory. Here you'll find eg00params.py and eg00-initvlas.txt. Edit them as described for
+lcmodel.py but rename them to match your event. Example:
+
+wa032bs11params.py
+wa032bs11-initvals.txt
+
+p6 is split into the burn-in and final sections. to run just the
+burn-in you may simply execute:
+
+run.py p6
+
+from your pipeline directory. To continue a past burn, run the line:
+
+run.py p6 mode=continue filedir=<directory made by burn-in>
+
+"This will run a new burn-in simulation, starting from the last
+iteration from the previous run. The results will concatenated."
+To do the final run, do:
+
+run.py p6 mode=final filedir=<directory made by burn-in>
+
+To run p6 all at once, use the line:
+
+run.py p6 mode=full
+
+This will produce all the same plots as the lcmodel.py method except
+those comparing apertures.
+
+See Patricio's edits to how-to-model in the /home/esp01/doc directory
+for further information on both methods and optional flags that can
+be provided to run.py when running p6. See models.txt, also in the
+doc directory, to see the models avalible in p6. 

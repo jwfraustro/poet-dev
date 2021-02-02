@@ -1,0 +1,247 @@
+     PHOTOMETRY of ORBITS, ECLIPSES, and TRANSITS PIPELINE DESIGN
+
+Goal: Production runs by undergrads with new pipeline, through
+photometry, and some level of integration with phase 2 pipeline.
+Full: Complete integration with phase 2, no need for IDL.
+
+Schedule:
+
+ 8 Mar	reader functions working, with examples
+15 Mar  init-data-badpix preliminary version working
+22 Mar	centering
+29 Mar	photometry
+ 5 Apr	full driver routine
+12 Apr	integration with stage 2
+19 Apr	document
+26 Apr	full stage-2 integration
+
+12 Apr goal is just to interface with the existing stage 2 pipeline
+26 Apr goal is to convert the stage-2 pipeline to the new format
+
+OVERVIEW
+
+Each analysis has the same steps:
+
+initialize
+bad pixels
+centering 
+photometry
+lightcurve fitting
+analyses
+
+Each step can have multiple branches (for example, different
+photometry apertures).  The analysis populates a directory structure,
+with each of the steps above creating a new level and each branch
+creating a subdirectory at that level.  For example, the top few
+levels might look like:
+
+events/wa012bs41/asym/ap3_0
+events/wa012bs41/asym/ap3_5
+events/wa012bs41/gauss/ap3_0
+events/wa012bs41/gauss/ap3_5
+
+Each step saves HDF5 (.h5) data files in its current directory.
+
+To handle incremental running and parallel processing, each step gets
+run in a separate process, reading the parent step's data and
+parameters from a control file, running the step, and saving the
+results.
+
+Runs use code and ancillary data from outside the tree.  There is no
+code or ancillary data editing inside the run directory.  Any code or
+ancillary data there is simply to document what the run used.
+
+Control files are only found in the run directories.
+
+MAIN PROGRAM
+
+The program is a stand-alone Python routine run from the shell.
+
+cd /home/esp01/events/WA018bs41/gauss/
+poet photometry.ctl
+OR
+poet photometry.ctl ap3_5 ap3_75
+
+Driver function:
+
+read control file
+  check integrity
+    directories exist already?
+    any output dir names duplicated?
+  restore the save file in the current dir
+  check if we're in the top level
+  while not in top
+    restore save file above us
+    link prior object to this new one
+for each case, fork or queue a process to:
+  copy event object
+  apply control file parameters for this case
+  make new dir
+  cd to it
+  run function for this step
+
+Reader functions:
+  TEP
+  runfile (combine with TEP?)
+  control file
+
+Step functions:
+  init-data-badpix
+  centering
+  photometry
+  lightcurve*
+  analyses
+    orbit*
+    brightness temperature*
+
+* others 50% responsible
+
+Each step function runs on the event object and then saves only new
+data in a local HDF5 file.
+
+Other functions:
+  tons, many converted from IDL, some rewritten
+  with Chris Britt
+
+User document - with William Bowman
+
+Issue:
+  can h5py save an object with named tags, e.g.:
+
+  wa018bs41.alan         = 3.2
+  wa018bs41.bill         = 'adgf'
+  wa018bs41.fred.charlie = 3.2
+
+DIRECTORY STRUCTURE EXAMPLE
+
+/home/esp01/events/wa018bs41/
+  wa018bs41.pcf
+  wa018bs41.h5		parameters, etc
+  wa018bs41_d.h5	data frames that won't get used past photometry
+  wa018bs41.out		text output from run
+  center.pcf
+  snapshot		read-only copy of code and ancil files
+  asym/
+    asym.h5
+    asym.out
+    photometry.pcf
+  gauss/
+    gauss.h5
+    gauss.out
+    photometry.pcf	prob. not same as photometry.pcf above
+    ap3_0/
+      ...
+    ap3_25/
+      ...
+    ap3_5/
+      ap3_5.h5
+      ap3_5.out
+      lightcurve.pcf
+    ap3_75/
+      ap3_75.h5
+      ap3_75.out
+      lightcurve.pcf
+      m1llqip/
+      m1ln/
+      m1reqip/
+        m1reqip.h5
+        m1reqip.out
+
+CONTROL FILES
+
+Control files contain parameter-value-comment data on indented lines.
+The word "case" means create a directory, change to it, and run with
+the current parameters.  If the directory exists, complain and don't
+run.  If there are two cases with the same name, complain and don't
+run.  The parameters that apply to a given case are those in effect at
+that point in the file.  Things indented above us don't count.  So:
+
+param1 1
+  param2 1
+    case p11_p21
+  param2 2
+    case p11_p22
+param1 2
+  param2 1
+    case p12_p21
+  param2 2
+    case p12_p22
+
+Event control file WA018bs41.pcf:
+
+# event file
+planet     WASP-18b # string
+ecltype    s # string
+photchan   4 # long
+visit      1 # long
+sscver       # string -
+pipev        # string
+lcfile       # string
+projdata     # string
+aorname      # string array (naor)
+ancildir     # string
+pmaskfile    # string
+kuruczfile   # string
+filtfile     # string
+psffile      # string
+horvecfile   # string
+
+centering.pcf:
+
+ctrmeth gauss
+  case gauss
+ctrmeth asym
+  case asym
+
+photometry.pcf:
+
+skyin 10
+skyout 30
+phtscale 5
+  phtap 2.5		# this indent is unnecessary but makes it clearer
+    case ap2_5
+  phtap 2.75
+    case ap2_75
+  phtap 3.
+    case ap3_0
+  phtap 3.25
+    case ap3_25
+    skyin 15
+      case ap3_25_skyin15
+  phtap 3.5
+    case ap3_5
+  phtap 3.75
+    case ap3_75
+phtscale 10
+  phtap 2.5
+    case ap2_5_scale10
+  phtap 2.75
+    case ap2_75_scale10
+  phtap 3.0
+    case ap3_0scale10
+  phtap 3.25
+    case ap3_25_scale10
+  phtap 3.5
+    case ap3_5_scale10
+  phtap 3.75
+    case ap3_75_scale10
+
+lightcurve.pcf:
+
+lcmodel mandelecl
+intraorder 2
+ramp risingexp
+  case risingexp
+ramp logpluslin
+  case logpluslin
+
+
+EVENT
+
+read
+  runfile
+  TEP
+  universal constants
+  Spitzer
+  channel
+

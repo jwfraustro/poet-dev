@@ -1,0 +1,1993 @@
+\documentclass[letterpaper,12pt]{article}
+\input{top-POET}
+\usepackage{epsfig}
+%\usepackage{hyperref}
+\textwidth=6.5in
+\textheight=9.5in
+\topmargin=-0.75in
+\oddsidemargin=0.0in
+\evensidemargin=0.0in
+
+\pagestyle{myheadings}
+\markright{POET}
+\pagenumbering{arabic}
+\graphicspath{fig}
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+\textsc{\LARGE University of Central Florida}\\[1.5cm]
+
+% Title
+\rule{\linewidth}{0.5mm} \\[0.4cm]
+{ \huge \bfseries POET User Manual \\[0.4cm] }
+\rule{\linewidth}{0.5mm} \\[1.0cm]
+
+\textsc{\Large A Data Analysis Code for Transiting Exoplanets}\\[1.5cm]
+
+% Author and supervisor
+\noindent
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft} \large
+\emph{Authors:}\\
+Ryan      \textsc{Challener} \\
+Zacchaeus \textsc{Scheffer}\\ \vspace{1.2cm}
+\end{flushleft}
+\end{minipage}%
+\begin{minipage}{0.4\textwidth}
+\begin{flushright} \large
+\emph{Supervisor:} \\
+Dr.~Joseph \textsc{Harrington}\\ \vspace{1.2cm}
+\end{flushright}
+\end{minipage}
+
+\vfill
+
+% Bottom of the page
+{\large \today}
+
+\end{center}
+\end{titlepage}
+
+
+\section{Introduction}
+\label{sec:intro}
+Photometry for Orbits, Eclipses, and Transits, or POET, is a Python
+code for modeling light curves of transiting exoplanets. It is
+end-to-end, taking in raw images, performing centering and photometry,
+and modeling the transiting light curve, including systematics
+effects.  It has models for the Spitzer ramp and intrapixel
+systematics, and several transiting planet models with many different
+parameters. Model parameter uncertainties are accurately estimated
+with a Markov-chain Monte Carlo routine.
+
+This document is intended to provide a user with the information necessary
+to run POET and interpret the results.
+
+\section{Code Structure}
+\label{sec:structure}
+POET is modular, separated into sections labeled p1 -- p10 and Zen
+Eliminates Noise (ZEN), an implementation of Pixel-Level Decorrelation
+(PLD, see Deming et al., 2015).  The modules functions are reading the
+data (p1), bad pixel masking (p2), centroiding (p3), photometry (p4),
+checks and plots (p5), light-curve modeling (p6 and ZEN),
+post-modeling analysis (p7), making tables (p8), making figures (p9),
+and writing light curves to files (p10).
+
+Note that POET can apply both BiLinearly Interpolated Subpixel
+Senitivity maps (BLISS, see Stevenson et al., 2012) and other pixel
+maps or PLD. Because BLISS is multiplicative and PLD is additive, they
+are handled by separate modeules of the code. All users should run p1
+-- p5, and then decide if they want to use a PLD or BLISS model and
+run ZEN or p6 -- p10 accordingly. We recommend using both to check for
+consistency in results.
+
+Every notable variable created within POET is saved in the event
+object (event). Frame parameters, such as centering position and
+photometry, are contained in a frame parameters object within the
+event object (event.fp), which is populated by p1 through p5.  The
+results of a model fit are saved in a fit object within the event
+object (event.fit), created by p6 and ZEN. The event object can be
+loaded into a Python session at any point in the analysis process
+using either the manageevent.py module or the run.py module, depending
+on how much of the pipeline has been run.
+
+\subsection{p1 - Reading the Data}
+\label{sec:p1}
+POET begins with p1. This module initializes the event object with
+the input values and reads the data files, the FITS images, into
+the event object, including header information. This is all handled
+by the initialization of the event object.
+
+p1 produces an image of the mean frame, which is the brightness
+averaged at each position for the entire observation. This figure,
+labelled *-fig101.png, shows the estimated location of the target with
+a red '+'. It is important that this mark lie exactly on top of the
+brightest pixel in the star. If not, the user must update the source
+estimate using the centering configuration in the manner described in
+Section \ref{sec:procedure}.
+
+\subsection{p2 - Bad Pixel Masking}
+POET uses the masks for permanently bad pixels that come with the data,
+but there are still transient bad pixels to find, such as cosmic ray hits.
+POET performs two iterations of 4$\sigma$ rejection by default, although
+this can be changed in the POET config files (pcf).
+
+POET splits the data up into chunks, usually of 64 frames although this
+can be edited in the pcf. It then takes the median of the pixel values at
+each (x,y) location on the array, then masks pixels outside 4 standard
+deviations of the median for that location. This median and standard
+deviation take into account the current mask, so iterations beyond the
+first can find additional bad pixels.
+
+The user can also mark specific pixels to be masked out in the pcf.
+
+\subsection{p3 - Centering}
+\label{sec:p3}
+This module finds the center of the target on the detector array at
+subpixel precision. This level of precision is necessary because of
+intrapixel effects introduced by subpixel sensitivity variations. The
+magnitude of these variations is greater than the strength of an
+eclipse signal, so accurately removing them is of utmost importance.
+
+There are several centering methods available:
+
+\begin{itemize}
+\item Fit Gaussian Centering (fgc) -- this method fits a 2D Gaussian
+  to the pixel values within a given circular radius around the peak pixel.
+
+\item Center-of-Light (col) -- this method weighs each pixel location
+  by its measurement, and determines the peak location as the
+  weighted average, akin to a center-of-gravity calculation. It considers
+  pixels in a square around the peak pixel with radius specified in
+  the pcf.
+
+\item Circular Center-of-Light (ccl) -- same as col, but uses a circle
+  instead of a square aperture.
+
+\item Least-Asymmetry Gaussian (lag) -- transforms the pixel values
+  into an array of symmetry values. Symmetry values are calculated based
+  on the pixels surrounding the position considered, with a square of
+  radius specified in the pcf. This is done for every pixel in a square
+  of (a different) radius around the peak value, also specified in the pcf.
+  It then fits an inverted Gaussian to the symmetry values to determine
+  the position of least asymmetry. See Lust et al. (2014).
+
+\item Least-Asymmetry Center-of-Light (lac) -- same as lag, but uses
+  the center-of-light algorithm rather than a Gaussian fit to the symmetry
+  values.
+
+\end{itemize}
+
+Fgc, col, and lag are the primary centering methods usually considered.
+
+\subsection{p4 - Photometry}
+\label{sec:p4}
+The goal of photometry is to measure the brightness of the target.  In
+the most basic sense, photometry is the sum of pixel values within an
+aperture. POET performs interpolated, flux-conserving photometry.  The
+pixels are divided into subpixels (default 5x5 subpixels per pixel),
+interpolating the pixel values while maintaining the total flux. It
+then sums the subpixel values within an aperture of specified
+shape and size. There are currently four photometry methods available:
+
+\begin{itemize}
+\item Constant Aperture -- this method uses the same aperture radius
+  for every frame. Radii usually range from 1.5 to 5.0 pixels, with the
+  best size in the 2.0 to 3.0 pixel range.
+
+\item Variable Aperture -- this method varies the aperture radius
+  for every frame. The aperture radius is calculated from the
+  noise-pixels value (see Lewis et al. 2013 and the Spitzer handbook).
+  The radii are the square root of the noise pixel value for each frame
+  plus a constant offset.
+
+\item Elliptical Aperture -- like variable apertures, this method
+  uses a different aperture size for each frame. However, the aperture
+  is elliptical, using the width of the PSF in X and Y, calculated by
+  fitting a Gaussian in p4. Consequently, this method only works
+  with Gaussian centering.
+
+\item Optimal -- this method fits a PSF to each frame and then
+  determines the 'optimal' photometry one should be able to achieve.
+  Typically this is reserved for IRS peak-up camera and MIPS photometry.
+
+\end{itemize}
+
+The user should run a large variety of photometry apertures and then
+determine the best during the modeling section (see Section \ref{sec:p6}).
+
+
+\subsection{p5 - Checks}
+\label{sec:p5}
+This module creates diagnostic plots and performs a few calculations
+in preparation for modeling (light-time correction, leap second correction,
+position RMS, etc.). 
+
+The figures are as follows:
+
+\begin{itemize}
+\item Fig501 -- Binned flux vs.\ Time. Simply the photometry plotted against
+  time, binned to a reasonable number of points. This plot gives the user
+  an idea of the shape of the ramp in the photometry and the level of the
+  intrapixel effect (see Section \ref{sec:p6}).
+
+\item Fig502 -- Binned flux vs.\ Pixel Position. This plot shows how the
+  measured brightness of the target changes with pixel position, which
+  shows the severity of the intrapixel effect for this data set.
+
+\item Fig503 -- Pixel Position vs.\ Time. This plot shows how the
+  target moves on the detector as time progresses, in both x and y. It
+  can be helpful in identifying rapid motion of the star, such as when
+  the telescope is adjusting its reaction wheels. Often, images
+  captured during such an event must be discarded.
+
+\item Fig504 -- Flux vs.\ Radial Distance. The brightness of the target
+  as it varies with distance from the center of the pixel. Similar to
+  Fig502, except the two plots have been combined into one.
+
+\item Fig505 -- Background Level vs.\ Time. The calculated background level
+  which is subtracted from each respective frame. This should be relatively
+  constant. Activity in the background level may indicate bad frames.
+
+\item Fig507 -- Noise Pixels vs.\ Time. The noise pixel parameter, calculated
+  according to Lewis et al. (2013). If using variable apertures, this plot
+  gives the user an idea of how the aperture radius is changing with time.
+  Any sudden changes in the noise pixel parameter have been shown to
+  impersonate transit features, so the user should check their end results
+  against this plot to identify possible false positives.
+
+\item Fig508 -- Noise Pixel Variance vs.\ Time. This plots the variance
+  of the noise pixel parameter over each subarray set number (64-frame
+  chunks). Spikes in this plot coincide with PSF activity. If they occur
+  during an astrophysical event, the event may actually be due to
+  telescope vibration. Consider clipping frames which correspond
+  to high noise pixel variance, or using elliptical photometry.
+
+\item Fig509 -- Gaussian Elliptical Area vs.\ Time. This plot is
+  only produced if Gaussian centering or a variant on that method
+  are used. Elliptical area is the area of an ellipse with axes
+  equal to three times the Gaussian width in x and y, measured from
+  p3. Like Fig508 and Fig509, spikes indicate PSF activity.
+
+\item Fig510 -- Gaussian Elliptical Area Variance vs.\ Time. Interpreted
+  the same as Fig508, but spikes can be more evident in this plot.
+
+\end{itemize}
+
+
+\subsection{p6 - Modeling}
+\label{sec:p6}
+The brunt of the work is done here, or in ZEN. p6 combines
+transiting planet models, ramp models, and pixel maps to create a
+model to compare to the photometry. It begins with a $\chi^2$
+minimization of the model, and then runs an MCMC routine to accurately
+determine model parameter uncertainties. The models of most importance
+are:
+
+\begin{itemize}
+\item mandelecl -- An eclipse model based on Mandel \& Agol (2002).
+  Parameters are eclipse midpoint, width, depth, ingress time, egress
+  time, and system flux.
+
+\item mandeltr -- A transit model based on Mandel \& Agol (2002).
+  Essentially identical to mandelecl, except depth is the cross-sectional
+  area ratio of the planet to the star, rather than the relative brightness
+  of the planet to the star.
+
+\item linramp -- A linear ramp model. The user should consider including
+  this model if the photometry appears to follow a linear baseline.
+
+\item quadramp -- A quadratic ramp model. Similarly, this should be
+  considered if the photometry follows some curvature.
+
+\item bilinint -- This is the BiLinearly Interpolated Subpixel
+  Sensitivity map (BLISS), which removes the subpixel sensitivity
+  variation from the photometry. It has no parameters, as the
+  sensitivity variations are all pre-calculated based on the
+  photometric variations. All p6 science runs should include this
+  model unless there is good reason to believe there is no intrapixel
+  sensitivity variation.
+\end{itemize}
+
+There are dozens of models for various scenarios. For a full list of them,
+see models.txt.
+
+p6 produces many plots. The following is a list of them, and how to interpret
+them:
+
+\begin{itemize}
+\item Fig6*01 -- Binned data with the model and model without the
+  transit/eclipse over-plotted. The model should follow the data. If not,
+  something has gone quite wrong. See other plots to diagnose.
+
+\item Fig6*02 -- Binned data with the model over-plotted, but non-eclipse
+  and non-transit models have been divided out. This should make the
+  feature clear. If you still see a trend in the baseline, consider changing
+  the ramp model. If there is still variation due to the intrapixel effect,
+  consider changing the bin size of the BLISS map.
+
+\item Fig6*03 --Trace plots of the various model parameters during the
+  MCMC, which show the value of each parameter as they change at each
+  step of the MCMC. Each parameter should be clustered around a
+  central average. With enough iterations, they should look like a
+  fuzzy blob. If there appears to be a pattern in the trace plots at
+  the early iterations, consider increasing the number of burn-in
+  iterations. If there is a pattern throughout, you may have a
+  multimodal or some other other complex posterior distribution;
+  consult Fig6*05.
+
+\item Fig6*04 -- Autocorrelation plots of model parameters. These should
+  start at 1 (as a data set is completely correlated with itself) but drop
+  to 0 quickly. If not, the effective step size of that model parameter
+  is relatively large compared to the total number of iterations. The user
+  should then consider increasing the total number of iterations in the
+  MCMC.
+
+\item Fig6*05 -- Correlations between model parameters. Ideally, these
+  should appear roughly Gaussian (peaks in the center, circularly
+  symmetrical).  There may be strong correlations between
+  parameters. If a correlation plot has no cohesive shape, this may
+  indicate very little constraint on a model parameter, in which case
+  the user should consider putting a prior on that parameter, either a
+  Gaussian or fixed, from the literature or a reasoanble calculation
+  (e.g., calculating expected eclipse duration from orbital
+  parameters).
+
+\item Fig6*06 -- Histograms of model parameters. These should also be
+  roughly Gaussian. If they appear flat, then that parameter is not well
+  constrained and the user may want to place a prior on it. If a histogram
+  is shoved up against the edge of a plot, the parameter is trying to
+  go outside the set boundaries. Consider adjusting the boundaries on
+  that parameter within reason (e.g. eclipse depth cannot go below 0).
+
+\item Fig6*07 -- BLISS map sensitivity. This plot shows the subpixel
+  sensitivity model used for this data set. The BLISS map should match
+  the binned flux.
+
+\item Fig6*08 -- BLISS map in 2D. There should be relatively smooth
+  changes in sensitivity with position.
+
+\item Fig6*09 -- Pointing histogram. This should look roughly
+  Gaussian. If there are outliers, the user may want to consider
+  clipping those points, as the BLISS model is ineffective in areas
+  without a large number of samples.
+
+\item Fig6*11 -- Correlated noise in the model residuals. This plot
+  shows the fit RMS as a function of bin size. Ideally the black line
+  should follow the red line. If the black line is significantly higher
+  than the red line, there is evidence for correlated noise at that binning
+  level. The blue dotted line indicates a binning level equal to the
+  ingress/egress duration, and the green dashed line indicates a binning
+  level equal to the eclipse/transit duration. Correlated noise
+  could indicated an unoptimized BLISS map, although sometimes it cannot
+  be completely removed.
+
+\end{itemize}
+
+p6 is an iterative process of determining best parameters' initial values,
+and boundaries, which models to use, and the best centering/photometry
+combination. For a discussion of this, see Section \ref{sec:procedure}.
+
+\subsection{p7 - Analysis}
+\label{sec:p7}
+This module performs some additional calculations based on the output of p6.
+Calculations include brightness temperature (for eclipses), ephemerides
+in Julian days, orbital parameter estimates, and correlations. In most cases,
+this can simply be run after p6 without any additional work for the user.
+
+\subsection{p8 - Tables}
+\label{sec:p8}
+This module makes tables, which are formatted for LaTeX.
+
+\subsection{p9 - Figures}
+\label{sec:p9}
+This module creates figures for papers. They are all previously made
+plots, but a bit fancier.
+
+\subsection{p10 - Light Curve Tables}
+\label{sec:p10}
+This module produces IRSA tables and FITS files containing the light
+curves that were modeled. These are meant to be submitted in support
+of publications.
+
+\subsection{p11 - Advanced Figures}
+\label{sec:p11}
+This module creates some even fancier plots. It is written to be edited
+according to the user's needs.
+
+\subsection{p12 - Advanced Tables}
+\label{sec:p12}
+This module creates some more LaTeX tables for papers. Note that it is
+run separately from poet.py.
+
+\subsection{ZEN - Zen Eliminates Noise}
+\label{sec:zen}
+This module, originally a standalone code, is an implementation of
+Drake Deming's Pixel-Level Decorrelation method (PLD, see his 2015
+paper).  It runs an MCMC with the PLD function, using MC$^3$
+(github.com/pcubillos/mccubed, Cubillos et al. 2017). ZEN replaces p6
+through p10, as it does modeling, calculates temperature, makes
+figures, and saves the FITS/IRSA files.
+
+ZEN has three main parts: centering, photometry, and bin size
+optimization; MCMC; and post light-curve-modeling analysis. First, ZEN
+loops over all given centering methods, photometry aperture sizes, and
+specified bin sizes to determine the optimal combination. Then, it
+runs MCMC on the best combination to determine parameter
+uncertainties. Finally, ZEN calculates planetary temperatures,
+eclipse/transit times in BJD, and creates light-curve
+files. Effectively, this combines the functionality of p6, p7, and
+p10, but using a PLD model rather than a sensitivity map.
+
+ZEN produces the following figures:
+
+\begin{enumerate}
+  \item *-normlc -- Normalized light curve with model
+    overplotted. Systematics have been subtracted out.
+
+  \item output\_zen\_model -- Non-normalized light curve with model
+    overplotted. Systematics not subtracted out.
+
+  \item output\_zen\_posterior* -- Posterior histograms for fitted
+    parameters. See Fig 6*06 of p6.
+
+  \item output\_zen\_pairwise* -- Pairwise posterior histograms for
+    fitted parameters.  See Fig 6*05 of p6.
+
+  \item output\_zen\_trace* -- Trace plots of fitted parameters. See
+    Fig 6*03 of p6.
+
+  \item *-logbsig -- A plot of log(binned-$\sigma$ $\chi^2$) values
+    for each centering, photometry, and bin size combination
+    considered. The code will tell you the combination which gives the
+    best results, but this plot can help identify other potential
+    combinations.
+
+  \item *-chislope -- A plot of the slope of the binned-$\sigma$
+    relation for each centering, photometry, and bin size combination
+    considered. Like the logbsig plot, this helps identify other
+    potential combinations.
+
+  \item *-pixels -- A plot of the pixels used in the PLD model, with
+    numbers corresponding to the same parameter numbers in the other
+    plots. The marked pixels should be clustered near the target star.
+
+\end{enumerate}
+
+See Section \ref{sec:procedure} for a discussion of how to run the
+ZEN module.
+
+\section{Configuration Files}
+POET uses almost exclusively ConfigParser
+(https://docs.python.org/3/library/configparser.html) format
+configuration files. There are two important configuration files:
+eventname.pcf and eventname-zen.cfg.
+
+\subsection{eventname.pcf}
+
+This file contains all configuration options for p1 -- p7, as well as
+the denoising options. It is split into several sections, separated by
+a header between brackers ([]). Typically, a single section contains
+the options for a single modules with some exceptions: p2 options are
+in the [event] section, only includes the chunk size and
+sigma-rejection settings; p5 has no options; and p7 options are
+included in the [params] section, which only includes a number of
+temperature calculations.
+
+Most configuration options take a single value. However, some options
+can be lists, or lists of lists, in which case the corresponding
+module will be executed for each possible combination of settings. For
+example, if the user specifies three photometry methods, two inner sky
+annulus radii, and two outer sky annulus radii, p4 will be executed 12
+times in parallel, and each of these processes may take many CPU cores
+(depending on the ``ncores'' option) and a significant amount of
+RAM. Users must be careful about how many resources their runs demand.
+Some notable settings that have this behavior: centering method,
+photometry method, photometry aperture scale, photometry aperture
+offset, and sky annulus radii.
+
+Occasionally, you may want to run several different configurations in
+parallel, but not every possible configuration. In that case, the user
+can create new sections titled [centering2], [photometry3], etc. Within
+these sections, all combinations will be run, but the code will not run
+every possible unique setting combination. For example, if the following
+is specified in the [photometry] section:
+
+\begin{verbatim}
+[photometry]
+phottype aper var
+...
+photap 1.0 2.75
+offset 0
+...
+\end{verbatim}
+
+\noindent
+will run aperture photometry and variable photometry each for every
+combination of ``photap'' and ``offset'', for 4 total executions. However,
+if the user instead creates two sections like the following:
+
+\begin{verbatim}
+[photometry]
+phottype aper
+...
+photap 1.0
+offset 0
+...
+[photometry2]
+phottype va
+...
+photap 2.75
+offset 0
+...
+\end{verbatim}
+\noindent
+then the code will still run both aperture photometry and variable
+photometry, but with only one combination of ``photap'' and ``offset''
+each, for a total of two executions. Note that all section names must
+be unique, and must be named to match the section format they follow
+(e.g., a photometry section must be named [photometry\#]).
+
+The specific options are discussed in further detail in Section
+\ref{sec:procedure}.
+
+\subsection{eventname-zen.cfg}
+
+This file contains all options for ZEN executions. There are only two
+sections: [EVENT] and [MCMC]. The [EVENT] section contains
+event-specific options, and [MCMC] provides settings for MC$^3$. The
+specific options are discussed in further detail in Section
+\ref{sec:procedure}.
+
+\section{Procedure}
+\label{sec:procedure}
+This section outlines the general procedures to follow in a single,
+complete POET run.
+
+Make a directory for your planet analysis in /home/esp01/events. This is
+where all your runs take place. Replace PLANETNAME and USERNAME with the
+proper information.
+
+\begin{verbatim}
+mkdir /home/esp01/events/PLANETNAME-USERNAME
+cd /home/esp01/events/PLANETNAME-USERNAME
+\end{verbatim}
+
+Next, pull POET from the local git repository. Replace DATE with the
+current date so that you know which version of POET you cloned, and so
+that directories will list in chronological order.
+
+\begin{verbatim}
+git clone --recursive /home/esp01/git/poet.git DATE
+cd DATE
+\end{verbatim}
+
+Before doing anything else, we need to compile some of the C
+code. This includes the centering algorithms, the least asymmetry
+code, the MCcubed module, as well as various models written in C. Run
+the following to build the code, and compile the user manual:
+
+\begin{verbatim}
+make
+\end{verbatim}
+
+Make subdirectories for each data set you plan to analyze. Naming conventions
+for event codes are formatted as follows:
+
+\begin{itemize}
+\item Two letter survey code. Options are:
+  \begin{itemize}
+  \item ha -- HAT-P survey
+  \item hd -- Henry Draper catalogue (e.g. HD209458)
+  \item tr -- TrES survey
+  \item wa -- WASP survey
+  \end{itemize}
+
+  \item Three number star designation. Always use exactly three numbers (e.g.
+    for WASP-12, use 012, or for HD209458 use 209).
+
+  \item The letter of planet (usually b, unless your system has many planets).
+
+  \item A letter designated the type of event. ``p'' for primary transit,
+    ``s'' for secondary eclipse, or ``o'' for orbit.
+
+  \item A number designating the Spitzer IRAC channel. Use 1 through 4 for
+    the primary channels, 5 for the blue peak-up array, and 6 for the MIPS
+    24um array.
+
+  \item A number designating the visit number.
+\end{itemize}
+    
+For example, if you have one eclipse observation with Spitzer channel
+2 and two eclipse observations with Spitzer channel 1 of exoplanet
+WASP-12b, then you would do the following:
+
+\begin{verbatim}
+mkdir wa012bs11
+mkdir wa012bs12
+mkdir wa012bs21
+\end{verbatim}
+
+You will need to get config files for your runs. Copy them from the example
+run/ directory into your new directories. For example:
+
+\begin{verbatim}
+cd wa012bs12
+cp ../run/*.pcf ../run/*.cfg ../run/*.txt .
+\end{verbatim}
+
+You will need to edit all these files before running. Next, edit the
+file eventname.pcf. First, it MUST be renamed according to your event
+code. For the second observation in channel 1 of our example
+observations, the command would be
+
+\begin{verbatim}
+mv eventname.pcf wa012bs12.pcf
+\end{verbatim}
+
+\noindent
+{\underline{\bf NOTE}}: This file will alawys be referred to as
+eventname.pcf, even though it will be renamed as above
+
+Now, open the renamed file with your favorite text editor, which is
+Emacs.  You will notice sections with headers designated by
+brackets. The first of these is the ``event'' section. In this section,
+the following parameters need to be changed according to your data.
+
+\begin{itemize}
+\item tepfile -- This is a Transiting Exoplanet file. They can be
+  found in /home/esp01/obsprep/TEP. If the file you need does not
+  exist, you will need to make one. TEP files must follow very
+  specific criteria, which you can read about in
+  /home/esp01/doc/README\_TEPfiles.
+
+\item datadir -- This is the name of the directory which holds the
+  data for this analysis. The location will be relative to topdir, a
+  user variable that is usually left unchanged from its default,
+  /home/esp01.  For WASP-12b channel 1 visit 2, the datadir would be
+  data/2010-Spitzer-too/wa012bs12.
+
+\item sscver -- This is the subdirectory in the data directory which
+  corresponds to the Spitzer pipeline version used for processing the
+  raw images. For our example, this is S18.14.0. You should make sure
+  your data was processed with the latest version of the pipeline
+  (19.2.0 for \textit{Spitzer} IRAC as of this writing).
+
+\item aorname -- This is the number corresponding to your datasets
+  AOR. Within the sscver directory, there will be multiple
+  mostly-numeric directories.  You need to determine which AOR
+  contains the data. To do so, check the bcd directory within each AOR
+  directory. The directory with the data will have far more files than
+  the others. Set the aorname to the number within the name of the AOR
+  directory. For the example, this would be 39200768. You can also
+  check the sizes of the AOR directories (e.g., with the 'du' utility)
+  or looks up your observation on the Spitzer Heritage Archive to
+  determine which ones contain the science observation (typically much
+  longer than calibration observations).
+
+\item aortype -- This tells POET the type of images in the AOR. Set
+  this to 0, since we are only including the data AOR.
+
+\item pmaskfile -- This is a fits file which contains the locations of
+  permanently bad pixels. It can be found in the data directory, and
+  should have a name like *pmask.fits. For our example, it's
+  sep07\_ch1\_pmask.fits.
+
+\item kuruczfile -- Kurucz files contain stellar spectra. You'll need
+  one which best represents the star your planet orbits. First, check
+  /home/esp01/ancil/kurucz/ for a file with your planet's name. If one
+  does not exist, you will need to fetch them from Kurucz's
+  website. See the file /home/esp01/doc/info\_kurucz for more
+  information. For our example, the file is wasp12b-fp02k2odfnew.pck.
+
+\item psffile -- This can be left as default unless you are not using
+  IRAC data.
+
+\item runp2 and runp3 -- Setting these to True will make POET
+  automatically run p2 and p3 after it finishes p1. If you do so, make
+  sure that you have configured the input files for those modules
+  before running p1.
+
+\end{itemize}
+
+Once you have configured the ``event'' section of the file, you may
+choose to run EDGAR (Easy Distrubuted Global Aggregator of Runs),
+which allows for easier execution of POET but less customization. If
+you would like to use EDGAR, read the sections below about filling out
+p10.pcf and initvals.txt and skip to the section
+\ref{sec:POE}. Otherwise, continue reading for further instructions on
+setting up your analysis.
+
+%% The next three sections (denoise, centering, photometry) are read
+%% slightly differently. If a section has a parameter with multiple space
+%% separated values, POET will be run once for each combination of
+%% parameter values. For instance 
+
+%% Lastly, the output directories are named based on particular parameters:\\
+%% \begin{tabular}{|c|c|c|}\hline
+%%   POET code & description & output name \\\hline
+%%   pd & denoise & $<$wavelet$>$\_$<$threshold$>$\_$<$numlvls$>$\\\hline
+%%   p3 & centering & $<$method$>$\\\hline
+%%   p4 & photometry & $<$phottype$><$photap$><$offset$>$*\\\hline
+%% \end{tabular}\\
+%% * The photometry output directory name will be just ``optimal'' or ``psffit'' if one of those is selected for phottype.\\\\
+%% If you want to run POET with two configurations of parameters which
+%% result in the same directory name, you will need to use pcfnaming. You
+%% can always use the pcfname parameter, but in this case you
+%% must. Setting `pcfname` to something other than ``None'' will append
+%% an underscore and the value of pcfname to the name of the output
+%% directory.
+
+Next, you need to fill in the centering section. The following
+describes each option and potential choices:
+
+\begin{itemize}
+\item pcfname -- This is a string that will be appended to the output
+  directory name. Output directories are named according to the ``method''
+  option. If you want to, for example, run ``fgc'' centering with two
+  different sets of options, you will need to set pcfname to something
+  other than None or the output of one run will overwrite the other.
+  
+\item method -- This is the centering method(s) to be used. Options are
+  discussed in Section \ref{sec:p3}. Note that you can list multiple methods
+  here, separated by spaces, and POET will run them all at once.
+
+\item ccores -- POET will use this number of cores for each centering
+  method.  Be careful that you do not use too many cores. Always check
+  CPU availability (e.g., with htop) before starting a cpu-intensive
+  run.
+
+\item noctr -- A boolean. If True, the code will only center the mean
+  image and assume that center position for all frames. This should
+  be False in almost all scenarios.
+
+\item ctrim -- This is the radius of the trimmed box around the
+  star. We use 8 pixels by defaults, but some testing has shown that
+  changing this number can drastically effect the centering, and thus
+  the photometry and the model fitting. If you find peculiar centering
+  results, consider adjusting this parameter.
+
+\item weights -- A boolean to use uncertainties as weights for fits.
+  Typically this is left False.
+
+\item fitbg -- A flag with options of 0, 1, or 2 for background
+  fitting when doing Gaussian centering. Setting 0 will not fit a
+  background, and just use a median. Setting 1 will fit a constant
+  background along with the Gaussian fit to the star. Setting 2 will
+  fit a plane background along with the Gaussian fit. Typically a
+  constant background is sufficient.
+
+\item runp4 -- Setting this to True will cause p4 to run immediately
+  after p3.  Only do so if you have configured the photometry section,
+  and keep in mind that p4 will be run on every centering method in
+  parallel, which can a significant number of CPUs and amount of RAM.
+
+\item cradius -- This is the size of the box around the star
+  considered when doing least-asymmetry centering. The code will try
+  to use the user input value, but sometimes must adjust to make the
+  calculation possible.
+
+\item csize -- THis is the size of the box around each pixel when
+  calculating an asymmetry value for least-asymmetry centering. The
+  code will try to use the user input value, but sometimes must adjust
+  to make the calculation possible.
+
+\item psfctrim -- Same as ctrim but for finding the center of the PSF.
+
+\item psfcrad -- Same as cradius but for finding the center of the PSF.
+
+\item psfcsize -- Same as csize but for tinding the center of the PSF.
+
+\item npskyin, npskyout -- Radii of the sky annulus for background
+  subtraction prior to noise pixel calculation. Should be the same as
+  you intend to use for sky calculation in photometry.
+
+\item ymask, xmask -- Specific pixels to mask out prior to centering.
+  This must be comma separated without spaces.
+
+\item newpsf -- Optional PSF file to use instead of the one given in the
+  [event] section.
+
+\item expand -- The expansion factor of the given PSF. Should be 5
+  for the \textit{Spitzer} PSF.
+
+\item nopsfctr -- Boolean to not do PSF centering, and assume the center of
+  the PSF is the center of the frame. Typically leave this False.
+
+\item srcesty -- Adjust this to match the y position of the star on
+  the detector, if the original estimate is off. Check *-fig101.png
+  (produced by p1). If the red '+' is on the center of the star, you
+  may leave this parameter alone. Otherwise, adjust as necessary. An
+  incorrect source estimate position can adversely affect your
+  centering and photometry results.
+
+\item srcestx -- Same as srcestx, except in the x dimension.
+\end{itemize}
+
+Now edit the photometry section.
+
+\begin{itemize}
+\item pcfname -- This is a string that will be appended to the output
+  directory name. Output directories are named according to the
+  ``phottype'', ``photap'', and ``offset'' parameters combined into a
+  single string. For example, if ``phottype'' is aper, ``photap'' is
+  2.5, and ``offset'' is -1.0, then the output directory will be
+  ap250-100. Like with centering, if you run two photometry configurations
+  that result in the same output directory names, the output will be
+  overwritten. Setting pcfname will change the output directory name to
+  prevent output overwrite.
+  
+\item phottype -- This is the photometry method. There are three main
+  choices: aper, for constant circular aperture photometry; var, for
+  variable circular aperture photometry (see Lewis et al., 2013); and
+  ell, for variable elliptical aperture photometry (see Challener et
+  al., 2019, in prep). There is also an ``optimal'' option, which
+  attempts to fit a PSF to the image and determine the optimal
+  total photometry one could achieve. This option is typically
+  reserved for IRS peak-up camera and MIPS observations.
+
+\item ncores -- This the number of cores used FOR EACH APERTURE. This
+  can easily get to be a large number of cores, so be very careful. At
+  the moment, photometry is inefficient with memory usage, duplicating
+  the images across every core used, so pay attention to your RAM
+  while running photometry. Also, check htop before starting a large
+  run.
+
+\item denphot -- Boolean. If True, use denoised data (produced by the
+  denoising module, pd). Typcally left False.
+
+\item photap and offset -- These are the photometry aperture radii
+  scalings and offsets that POET will run. In general, when
+  calculating aperture size for each frame $i$, POET uses the formula
+  ${\rm radius}_i = {\rm photap} \times {\rm base}_i + {\rm offset}$,
+  where ${\rm base}_i$ is set by ``phottype''. If ``phottype'' is
+  aper, ${\rm base}_i$ is 1 for all frames, so all frames use the same
+  aperture size. If ``phottype'' is var, ${\rm base}_i$ is the square
+  root of the noise pixels of each frame, a calculation described in
+  Lewis et al., 2019. If ``phottype'' is ell, ${\rm radius}_i$ is
+  calculated once with ${\rm base}_i$ as the Gaussian $x$ width of the
+  target, and once with the Gaussian $y$ width of the target. These
+  two ${\rm base}_i$ are used to calculate two ${\rm radius}_i$ which
+  define the respective $x$ and $y$ ellipse widths for the elliptical
+  aperture. Note that POET will run every combination of photap,
+  offset, and phottype given, which can use a significant number of
+  CPUs and RAM.
+
+\item skyin, skyout -- The radii of the annulus, in pixels, that will
+  be used to determine the sky level. Note that POET will run all
+  combinations given. Typically, 7 and 15 work well, but adjustment
+  may be necessary if there are other nearby stars.
+
+\item skyfrac -- Frame will discarded if less than this fraction of
+  sky pixels are marked as good pixels.
+
+\item skymed -- Boolean for sky estimation method. If True, the code will
+  take a median of all pixels in the sky annulus. If False, it will use
+  a mean.
+
+\item verbose -- Verbosity boolean.
+
+\item apscale -- Images will be interpolated by this factor before
+  photometry is done. 5 works well for \textit{Spitzer}.
+
+\item psfexpand -- The expansion factor of the given PSF. Should be 5
+  for the \textit{Spitzer} PSF.
+
+\item runp5 -- Setting this to True will immediately run p5 after p4
+  completes. This is usually safe, as p5 has no configuration.
+
+\item otrim -- Radius of window around the target to consider for optimal
+  photometry.
+\end{itemize}
+
+
+Finally, edit poet.pcf, which is in your top level
+directory. Currently, all you need to edit is the run directory and
+the event code in the POET section of poet.pcf, which should both be
+set to one of the name of the directory you made earlier
+(e.g. wa012bs12 for our example) which contains the other .pcf file
+you just filled in.
+\\In poet.pcf:\\
+\begin{verbatim}
+[POET]
+rundir    wa012bs12
+eventname wa012bs12
+...
+\end{verbatim}
+
+Now that you've set everything up, you can run p1 with the following
+command from the run/ directory:
+
+\begin{verbatim}
+poet.py p1
+\end{verbatim}
+
+If you set runp2, runp3, runp4, and runp5 to True, then this will run
+all the way through p5. You can run each step individually as well,
+with the following commands, which is recommended for new users:
+
+\begin{verbatim}
+poet.py p2
+poet.py p3
+poet.py p4 CENTDIR
+poet.py p5 CENTDIR/PHOTDIR
+\end{verbatim}
+
+Make sure to replace CENTDIR and PHOTDIR with the proper names.  This
+should not include the ``run'' directory (wa012bs12 in the example) so
+CENTDIR should be something like ``fgc'' and PHOTDIR should be
+something like ``ap250+000''.
+
+There are two ways to continue with the analysis, and you should
+do both:  ZEN, and p6 through p10. First the remaining p* modules
+will be described, and then ZEN. Keep in mind that ZEN
+is a replacement for p6 through p10.
+
+Once you have run all the centering and photometry methods that you
+would like, you can move on to p6, where the real work begins.
+
+In my experience, the following is the best way to go about modeling
+light curves. Others may find that something else works best for them,
+and it may vary between datasets. Here is the procedure:
+
+To begin, you will need to edit the params section of the renamed
+eventname.pcf (wa012bs12.pcf in the example):
+
+\begin{itemize}
+\item planetname -- This string will be used for plot titles and such.
+  Edit this to be your planet name as you want it to appear on plots.
+
+\item modelfile -- This should be the name of the initivals file, which
+  should be eventname-initvals-bliss.txt. In the example, this
+  is wa012bs12-initvals-bliss.txt.
+
+\item printout -- The name of the file which will contain the results. The
+  default is fine.
+
+\item timeunit -- Units of time. Generally use 'orbits'.
+
+\item tuoffset -- Offset in the time units. Useful if using Julian days
+  (e.g. 2450000).
+
+\item model -- This is where you choose which models will be included
+  in the total model. See /home/esp01/doc/models.txt for a complete
+  list.  The most common are listed in Section \ref{sec:p6}. Note that
+  this is interpreted as a list of lists where each line is a
+  list. Each line after model (that should be interpreted as a list of
+  models) must be indented by at least one space. If you use an
+  intrapixel map, it must the last model in the line.
+
+\item mcmc -- A flag that toggles the use of MCMC. Setting this to
+  False can significantly decrease runtime, but you will not get
+  uncertainties on model parameters and many of the p6 figures will
+  be useless. Note that in the code, this toggle amounts to filling
+  the MCMC posterior array with zeroes, and setting the best-fitting
+  parameters to the results of the least-squares fit. Toggling off
+  both MCMC and least-squares is not recommended.
+
+\item numit -- Two-element integer array, with the first being the number
+  of burn-in iterations and the second being the number of total iterations.
+  Typical numbers for early runs are 1e3 burn-in, 1e4 full. A final run
+  should use more, such as 1e4 burn-in, 1e5 total. At the very least, you
+  want to make sure that your run converges.
+
+\item nchains -- Number of parallel MCMCs. 6 is generally sufficient
+  when using the Snooker random walk algorithm.
+
+\item rwalk -- MCMC random walk algorithm. Options are 'mrw', 'demc',
+  and 'snooker'. Generally use 'snooker'. DEMC and Snooker adapt the
+  step size as the chains progress, so that the user does not have to.
+  Snooker converges the fastest, and requires less chains and thus,
+  less processing power.
+
+\item nbins -- Number of points on the resulting plots. 60 is clear,
+  although sometimes more is preferred to see shorter-timescale
+  features.
+
+\item boundecl -- Leave this as True to force the eclipse to stay
+  within the data range. This should not have to be changed unless you
+  suspect your observation missed the eclipse.
+
+\item chi2flag -- Boolean to adjust error bars such that reduced
+  chi-squared is forced to 1. Spitzer overestimates errors, so we use
+  this to scale them down to reasonable values. Leave this as True,
+  except when comparing ramp models, as the rescaling forces a good
+  fit when there may be none.  For example, if there is an obvious
+  ramp effect in the light curve but your model does not include a
+  ramp model.
+
+\item numcalc -- Number of Monte Carlo temperature calculations in
+  p7. This can take a long time with a large number of calculations,
+  but you only have to run p7 once. The Monte Carlo pulls values from
+  the MCMC posterior, so if numcalc $>$ numit, the code reduces
+  numcalc to make the calculation possible.
+
+\item thinning -- This is the step size for histogram thinning. If you
+  have a lot of iterations, you may want to raid this number (and similar
+  for less iterations).
+
+\item allplots -- Boolean for additional plots to be made. Making this
+  False can decrease run time.
+
+\item leastsq -- Perform least-squares fit before the MCMC. Leave this as True
+  unless you are having issues with the least-squares fit.
+
+\item normflux -- Normalize flux at each position if there are more than 1
+  positions. In most cases, this parameter will have no effect.
+
+\item noisysdnr -- SDNR of noisy data set. Leave this as None, as we no longer
+  use denoised data.
+
+\item preclip -- Number of frames to remove from the beginning of the
+  data set. If you notice a strong trend in the beginning of the data
+  set, or some of the data seem strange, you may consider clipping
+  them.
+
+\item postclip -- Same as preclip, except the end of the data set.
+
+\item interclip -- Same as preclip, except you can specify multiple
+  ranges of data points to remove (same format as models).
+
+\item xstep and ystep -- Bin size of the BLISS map in x and y
+  respectively. Leaving these as 0's will set them to the RMS of
+  the point-to-point variation in the position of the target in x
+  and y, respectively. This is generally sufficient.
+
+\item minnumpts -- Minimum number of points per bin in the BLISS
+  map. It should be at least 4 for your final run (see Stevenson et
+  al. 2012).
+
+\item isfixipmap -- Boolean to fix BLISS map to best-fit values after
+  burn-in. Generally leave this False.
+
+\item ipclip -- List of ranges of points to remove from intrapixel
+  mapping. Generally unnecessary.
+
+\item issmoothing -- Boolean to turn smoothing on or off. This
+  convolves a Gaussian kernel with the image. I recommend leaving as
+  False.
+
+\item nx and ny -- Half-width of the Gaussian kernel in units of pixels
+  in x and y, respectively. Unused if issmoothing is False.
+
+\item sx and xy -- Standard deviation of the Gaussian kernel in units
+  of pixels in x and y, respectively. Unused if issmoothing is False.
+
+\item xdiv and ydiv -- Locations in subpixels to divide pixels into
+  quadrants.  Only used with quadip4, a model we no longer use. Leave
+  as 0.0.
+
+\end{itemize}
+
+Next, you'll want to edit the initvals file. This file contains a list
+of all the available models along with their parameters, parameter
+minima, parameter maxima, and step-sizes. Rename the initvals with
+your planet code like so:
+
+\begin{verbatim}
+cd run
+mv initvals.txt wa012bs12-initvals-bliss.txt
+cd ..
+\end{verbatim}
+
+The code will run without renaming this file, but it is much easier
+to keep track of your runs if this filename is changed this way, and
+joint fits require the files to be renamed.
+
+Navigate to the eclipse and ramp models that you selected in your
+params file. For the eclipse model, you'll want to make sure that
+there are reasonable bounds on your parameters. Generally, you'll want
+to begin with wide boundaries and narrow them as necessary. For
+example, if using mandelecl you might have a few lines like this:
+
+\begin{verbatim}
+mandelecl
+midpt     	width     	depth     	t12       	t34       	flux
+5.0108e-01	4.6942e-02	2.9199e-04	3.3613e-03	3.3613e-03	5.2850e+05
+4.7000e-01	1.0000e-04	0.0000e+00	1.0000e-03	1.0000e-03	0.0000e+00
+5.3000e-01	1.0000e-01	5.0000e-02	8.0000e-02	8.0000e-02	1.0000e+07
+1.0000e-04	1.0000e-04	1.0000e-05	1.0000e-05	-4	5.0000e+00
+\end{verbatim}
+
+Be sure that the top row of any model, the initial values, lies
+between the numbers in the second and third row (the minimum and
+maximum for that parameter, respectively). Step sizes should be one or
+two orders of magnitude smaller than their corresponding initial
+value, although the step size will be adjusted dynamically by the DEMC
+algorithm. Note that I have set the step size on t34, the egress time,
+to -4. This will fix the egress time to the value of the parameter in
+the 4th position, the ingress time. Unless your planet's orbit is
+extremely eccentric, it is probably a good idea to set these
+parameters equal.
+
+Note that a step size of 0 will fix a parameter to the initial value; it
+will not be varied in the MCMC. This can be useful if the data set does
+not constrain a value well, and any Gaussian prior you can put on the model
+is too wide to make any impact.
+
+Lastly, you you need to edit the ``p6'' section of your renamed
+eventname.pcf in the ''run'' directory. The options in p6.pcf are as
+follows:
+
+\begin{itemize}
+\item centering -- 'all' or a list of exact names of the centering
+  directories. If the first item in the list is 'all', p6 will try to
+  run on all subdirectories of the run directory that are named like a
+  centering directory. Otherwise, p6 will ignore all centering
+  directories not in the list.
+
+\item photometry -- 'all' or a list of photometry directories. If
+  'all', p6 runs on all photometry directories in the specified
+  centering directories. If a list is given, p6 run on any photometry
+  directory that matches a name in your list that is also in a
+  centering directory specified by the previous option(centering).
+
+\item modeldir -- the name of the output directory.
+
+\item threads -- The number of parallel threads to run. Note that if
+  mcmc is set to True, each thread will use nchains processes, so your
+  total number of processes is nchains $\times$ threads.  If you are
+  running MCMC, it is recommended to keep the thread count low.
+\end{itemize}
+
+It will save time to run p6 on a single combination of centering and
+photometry, to find a good fit before trying to fit to all
+combinations of centering and photometry. So edit p6.pcf to only
+include a single centering method (e.g., fgc) and a single photometry
+aperture (e.g., ap2500715).
+
+Once you have configured these three files, you are ready to run p6. Use
+the following command:
+
+\begin{verbatim}
+poet.py p6
+\end{verbatim}
+
+To have a date added to the output directory, do:
+
+\begin{verbatim}
+poet.py p6 nodate=False
+\end{verbatim}
+
+Alternatively, you can override p6.pcf by specifying a directory and outdir:
+
+\begin{verbatim}
+poet.py p6 modeldir=OUTDIR CETERDIR/PHOTDIR
+\end{verbatim}
+
+Or, to just override p6.pcf's outdir:
+
+\begin{verbatim}
+poet.py p6 modeldir=OUTDIR
+\end{verbatim}
+
+As p6 runs, it will display the MCMC's progress (unless MCMC was
+toggled off). There are several things you should notice:
+
+\begin{itemize}
+\item Are the chains trying to leave their imposed boundaries? This would
+  be evident in the list of number of times each parameter tried to step
+  outside it's boundaries. If these numbers are the same order of magnitude
+  of your iterations, then your boundaries may be too tight. Similarly,
+  if the acceptance rate is very low (say less than 10\%), then your
+  boundaries might be too tight.
+
+\item Are the chains converging? Every 10\% of the iterations, POET
+  will print the Gelman \& Rubin (GR) criterion for each parameter. If
+  the chains are converging, these numbers will get closer to 1 as the
+  chains continue. We say that model parameters converge if their GR
+  criterion is within 1\% of unity (i.e., $<$1.01). If they are not
+  converging, you may have unconstrained parameters, or you may have
+  boundary issues.
+
+\item Did the least-squares fit find a reasonable fit? Take a look at the
+  best-fit parameters prior to the MCMC. Do they look reasonable for an
+  eclipse, or are they pushed up against the imposed boundaries? If so,
+  consider changing the boundaries or placing priors on parameters.
+
+\end{itemize}
+
+Once the run finishes, it will produce many plots, most located in a
+subdirectory of the aperture directory. See Section \ref{sec:p6} for a
+discussion of the plots and how to interpret them. If you make any
+changes, rerun p6 and observe how the output changes.
+
+Once things look good with the current set of models, try some other
+ramp models. Compare the Bayesian Information Criterion (BIC), found
+in the printout file (usually results.txt) between the results with
+different ramp models. The BIC is related to chi-squared and is a
+measure of goodness of fit, but it penalizes models with additional
+parameters.  Find the ramp model which results in the lowest BIC. This
+is your best model for whichever centering and photometry combination
+you are running on.
+
+Now we want to compare different centering and photometry
+combinations. Go back to your initial run directory. For example:
+
+\begin{verbatim}
+cd /home/esp01/events/.../wa012bs12/
+\end{verbatim}
+
+Now we want to compare different centering and photometry
+combinations. To do this, edit the p6 section of the renamed eventname.pcf
+to now include all centering and photometry combinations you are
+interested in. Then change to the top level directory and run p6:
+
+\begin{verbatim}
+cd ..
+poet.py p6
+\end{verbatim}
+
+This will run all combinations of centerdir and photdir that you
+specified, in series, which may take some time. If all goes well,
+several plots will be placed in the plots directory (plots/OUTDIR
+within your ``run'' directory).  Take a look at those labelled
+sdnr*.png and depth*.png. They show standard deviation of normalized
+residuals (SDNR) vs.\ aperture size for each centering method and
+eclipse depth vs.\ aperture size for each centering method,
+respectively. There is also a plot of the binned-$\sigma$ $\chi^2$
+vs.\ aperture size, which is a measurement of correlated noise from
+Deming et al. (2015). The final line output by p6 should tell you
+which centering and photometry resulted in the best binned-$\sigma$
+$\chi^2$.
+
+Take a look at the depth vs.\ aperture size plot. Ideally, the eclipse
+depth should not change drastically with aperture size. If it does
+change significantly (i.e. it changes by more than 1$\sigma$), you may
+need to do some investigation as to the cause, because a reviewer will
+surely ask.
+
+Now that you have determined the best centering and photometry, you
+can go back to running p6 on a single centering and photometry
+combination.  Rerun p6 with all the ramp models you tried earlier to
+verify that the best ramp model has not changed with this change in
+photometry and centering. If it has, check the difference in BIC
+between the two models.  Is it very small? Then the choice of ramp
+model is likely inconsequential, but you should compare model
+parameter results to be sure they do not change significantly.
+
+Assuming all has gone well up to this point, you are ready for a final
+p6 run. Set the iterations to somewhere around 1e4 or 1e5 (the goal is
+enough iterations to converge), make sure chi2flag is True, turn on
+mcmc if it's toggled off, and run p6 one last time. Make sure that the
+results have not changed too much with the MCMC.
+
+If you are satisfied with the results, you can run p7. There is no
+config file for p7, since the only input in the numcalc variable in
+the params file from p6. To run p7, do:
+
+\begin{verbatim}
+poet.py p7 CENTERDIR/PHOTDIR/MODELDIR
+\end{verbatim}
+
+Replace MODELDIR with the directory name of the location of your p6 output
+for the final run. p7 will append a number of results to your printout file
+(normally results.txt), most importantly a brightness temperature
+calculation and eclipst/transit times in BJD..
+
+From here, you can simply run p8 and p9 the same way:
+
+\begin{verbatim}
+poet.py p8 CENTERDIR/PHOTDIR/MODELDIR
+poet.py p9 CENTERDIR/PHOTDIR/MODELDIR
+\end{verbatim}
+
+p8 will add a nice table to your printout file, and p9 will produce some
+fancy plots.
+
+There is one final step -- making light curve tables with p10. Every
+paper we submit comes with the actual data (the light curves) that we
+analyzed. First, edit the p10.pcf file. This file is very particular
+with formatting. Comments are allowed, but they must be on separate
+lines and the first character of the line must be a \# character.
+Lines are read individually as single entries, which allows for spaces.
+There must be a blank line between each list, so that the file reader
+knows when it reaches the end of a list. The `end' on the final line
+of the file is necessary, so the reader knows when it reaches
+the end of the file.
+
+One you have edited p10.pcf to your liking, run p10 with:
+
+\begin{verbatim}
+poet.py p10 CENTERDIR/PHOTDIR/MODELDIR
+\end{verbatim}
+
+You will see a new directory irsa/ within your MODELDIR. This
+directory will contain an IRSA table and FITS file for each
+p6 output in MODELDIR. Note that it will only contain the fit
+to the first set of models in your p6 run. This should not be a
+problem, so long as your final p6 run only included the best
+model.
+
+At the time of this writing, p11 and p12 are executed on their own,
+like:
+
+\begin{verbatim}
+lib/p11advtables.py RUNDIR/CENTERDIR/PHOTDIR/MODELDIR
+lib/p12advfigs.py RUNDIR/CENTERDIR/PHOTDIR/MODELDIR
+\end{verbatim}
+
+They require some edits from the user, and are only useful for making
+plots for publication. They are entirely optional.
+
+Now you'll need to run ZEN, a different way to do light-curve
+modeling.  ZEN covers everything from p6 through p12. At a high
+level, ZEN applies the Pixel-Level Decorrelation (PLD) method,
+as described in Deming et al. (2015). This method uses the values
+of pixels themselves to remove the intrapixel effect, rather than
+modeling intrapixel gain variability as is done in p6. For a full
+discussion, see the paper by Deming et al. (2015).
+
+Before you run ZEN, you will need to edit eventname-zen.cfg in the ``run''
+directory. First, rename it (or create it):
+
+\begin{verbatim}
+cd wa012bs12
+mv eventname-zen.cfg wa012bs12-zen.cfg
+\end{verbatim}
+
+The following describes the options in the configuration, which are
+split into [EVENT] and [MCMC] sections:
+
+\begin{itemize}
+\item [EVENT]
+  \begin{itemize}
+\item eventname -- This is the event code for your observation. E.g.,
+  wa012bs12. It must match the name of the p1 and p5 output files
+  (minus the suffix).
+
+\item modelfile -- The name of the file containing MCMC parameter values,
+  boundaries, and step sizes.
+
+\item outdir -- The name of the output directory that will be
+  created. It should not already exist.
+
+\item cent -- Centering directories to consider when optimizing
+  centering methods, photometry apertures, and bin sizes.
+
+\item phot -- Photometry directories to consider when optimizing
+  centering methods, photometyr apertures, and bin sizes. The code
+  will look for each ``phot'' directory within each ``cent''
+  directory, skipping any combinations that do not exist.
+
+\item bintry -- A list of bin sizes to try when optimizing centering
+  methods, photometry apertures, and bin sizes. Setting this 0 will set
+  to the default bin sizes, which is 1, 2, 4, 8, 16, etc. up to the
+  maximum bin size.
+
+\item maxbinsize -- The maximum bin size, non-inclusive. If this is
+  set too high, the code will exit and instruct the user to decrease
+  maxbinsize below a threshold.
+
+\item nprocbin -- Number of CPUs used in the optimization.
+
+\item nbinplot -- Number of bins in light curve plots.
+
+\item preclip -- All data prior to this orbital phase will be clipped
+  prior to modeling.
+
+\item postclip -- All data after this orbital phase will be clipped
+  prior to modeling.
+
+\item interclip -- All data in specified orbital phase ranges will be
+  clipped prior to modeling.
+
+\item numcalc -- Number of calculations in the temperature Monte
+  Carlo.  If this is higher than the number of MCMC iterations, it
+  will be reduced to match the MCMC iterations.
+
+\item models -- List of models included in the full model. Multiple
+  model sets can be supplied, separated by newlines.
+
+\item npix -- The number of pixels used in the PLD model. The default is
+  9. If this is changed, the modelfile must be updated to reflect the
+  new number of parameters in the PLD model.
+
+\item priorvars -- A list of strings that match parameter names in
+  python\_models.py.
+
+\item priorvals -- A list of Gaussian prior means, lower uncertainties, and
+  upper uncertainties for each parameter in ``priorvars''. There should
+  be 3 numbers for each parameter in ``priorvars'', with the first being
+  the mean, the second being the lower uncertainty, and the third
+  being the upper uncertainty.
+
+\item slopethresh -- A slope threshold for selection against correlated
+  noise. If the slope of a line fit to the model residuals vs.\ bin size
+  is higher than this threshold, that centering and photometry combination
+  is rejected. In almost all cases, this number can be set to -0.3. Lower
+  numbers are more strict, down to -0.5 (no correlated noise). If none
+  of the selected centering and photometry combinations are below this
+  threshold, the code will ignore the threshold and warn the user.
+
+\item postanal -- True/False to complete post-analysis calculations.
+  If False, the code will not calculate temperatures, eclipse/transit
+  times, or generate light-curve tables, which can save significant
+  time.
+
+\item papername -- Name of your publication, if you intend to write
+  one. This will be used in the topstring of the FITS and IRSA files
+  that are generated.
+
+\item month -- Month of paper submission.
+
+\item year -- Year of paper submission.
+
+\item journal -- Journal where paper will be submitted.
+
+\item instruments -- Instruments used in observations.
+
+\item programs -- Space-separated list of telescope program numbers.
+
+\item authors -- Newline-separated list of paper authors.
+\end{itemize}
+\item [MCMC]
+\begin{itemize}
+\item nsamples -- The number of samples in the MCMC.
+
+\item nchains -- The number of chains in the MCMC.
+
+\item walk -- The MCMC walk method. See p6 description.
+
+\item grtest -- A boolean flag telling the code to do the
+  Gelman-Rubin convergence test. Should be true in most cases.
+
+\item burnin -- The number of iterations which are removed from the
+  posterior distributions, for each chain. Around 10\% of the total
+  iterations per chain is sufficient.
+
+\item plots -- Boolean for plotting. Toggling to False can save some
+  run time.
+
+\item bins -- Boolean for binning. Toggling to False will save
+  considerable run time, but will disable bin size optimization.
+
+\item savefile -- Name of the output file which will contain all
+  samples from the MCMC.
+
+\item logfile -- Name of the file which will contain all MCMC
+  text output.
+
+\item leastsq -- Boolean for doing a least-squares minimization of
+  parameters prior to MCMC. Leave this as True in most cases, unless
+  you want a specific starting point for your chains.
+
+\item titles -- Boolean for titles on plots. 
+
+\item chisqscale -- Boolean to rescale data uncertainties such that
+  reduced chi-squared is 1. This helps with overestimated error bars.
+  Leave as True for Spitzer data.
+
+\item thinning -- MCMC chains will be thinned by this factor for
+  plotting purposes. Increasing this can make plots generate faster,
+  and be more readable.
+
+  \end{itemize}
+\end{itemize}
+
+Once you are satisfied with your configuration, you can run ZEN with
+the following command:
+
+\begin{verbatim}
+poet.py zen
+\end{verbatim}
+
+which will seek out your configuration file, provided it ends in ``-zen.cfg''. You can give a specific configuration file with:
+
+\begin{verbatim}
+poet.py zen PATH/TO/CONFIG.cfg
+\end{verbatim}
+
+This will run on all directories and find the best centering,
+photometry, and binning. Afterwards, it creates an output directory in
+the directory corresponding to the best centering and photometry named
+with the date and the event code
+(e.g. wa012bs12/fgc/ap2000715/zoutput-model01).  Figures can be
+interpreted in the same way as p6 figures, in almost all
+cases. IRSA/FITS files can be found in the irsa/ subdirectory within
+the output directory.
+
+Congratulations! You've done a complete analysis!
+
+\section{Joint Fits}
+POET is capable of fitting simultaneously to multiple light curves,
+both with BLISS and PLD models.  This can be very useful if
+you expect parameters to be the same between data sets. For example,
+the midpoint and duration of a planet's eclipses should not change
+appreciably between different observations, provided the observations
+are not separated by a lot of time.
+
+To do a joint fit, make a new ``run'' directory called joint, and some
+dummy directories for the centering and photometry so that everything
+is organized as it would be with a normal p6 run.
+
+\begin{verbatim}
+mkdir -p joint/fgc/ap250+000
+\end{verbatim}
+
+Now, copy the p5 output files from the runs which you want to
+fit jointly. E.g. do something like this:
+
+\begin{verbatim}
+cp wa012bs11/fgc/ap250+000/wa012bs11_p5c.dat joint/cent/phot
+cp wa012bs12/fgc/ap250+000/wa012bs12_p5c.dat joint/cent/phot
+\end{verbatim}
+
+If you want to do a joint fit with ZEN, you will also need to copy
+the p1 output files from the observations you want to fit jointly.
+For example:
+
+\begin{verbatim}
+cp wa012bs11/wa012bs11_ini.dat joint/
+cp wa012bs11/wa012bs11_ini.h5  joint/
+cp wa012bs12/wa012bs12_ini.dat joint/
+cp wa012bs12/wa012bs12_ini.hg  joint/
+\end{verbatim}
+
+Then copy or create the required files for the joint fit, placing all
+of them within the run directory (here named ``joint''). You will need
+
+\begin{itemize}
+\item For p6 joint fits:
+  \begin{itemize}
+\item A pcf with a params section for each data set to be fit jointly.
+
+\item A single pcf with a p6 section which gives the location of the
+  data to be fit (here centering = cent and photometry = phot). The
+  name of this file must match the ``eventcode'' in poet.pcf.
+
+\item An initvals.txt file for each data set, with names matching
+  those specified in the params sections of the pcfs.
+  \end{itemize}
+\item For ZEN joint fits:
+  \begin{itemize}
+  \item A configuration file for each data set to be fit jointly, all with
+    names ending in -zen.cfg.
+
+  \item An initvals.txt file for each data set, with names matching those
+    specified in the ZEN configuration files.
+  \end{itemize}
+\end{itemize}
+
+
+If this is all set up correctly, you can simply run POET with
+
+\begin{verbatim}
+poet.py p6
+\end{verbatim}
+
+\noindent
+or
+
+\begin{verbatim}
+poet.py zen
+\end{verbatim}
+
+For BLISS, the code will use the [p6] section of the first file it
+reads, and the [params] sections of the pcf corresponding to each
+dataset. For MCMC settings that cannot vary on a per dataset basis,
+the code will use the option in the first file it reads in
+alphanumeric order. It's best to set your MCMC options the same in all
+the pcf files to prevent confusion.
+
+For ZEN, the code will use the [EVENT] sections of each configuration
+file it finds, and will use the [MCMC] section of the first file it
+finds, in alphanumeric order. Again, it's best to set your MCMC
+options the same in all the configuration files to prevent confusion.
+You must also set the ``bintry'' value to a single number in all ZEN
+configuration files, as bin size optimization is not supported during
+joint fits (the code will exit). In most cases, you should use the
+optimal bin sizes you determined from the fits to the individual data
+sets.
+
+To share parameter values between datasets, set the step size to a
+negative number equal to the index of the parameter, just like
+usual. Note, however, that the model parameters are concatenated into
+a single list. For example, if you wanted to set the midpoint of the
+mandelecl model in the second data set equal to the midpoint of the
+mandelecl model in the first data set, then you would set the step
+size of the midpoint in the second data set to -1. However, if you
+wanted to share parameters between the second and third data sets, you
+will need to count the total number of parameters in the models of the
+first data set and offset accordingly.
+
+\subsection{EDGAR}
+\label{sec:POE}
+EDGAR stands for Easy Distributed Global Aggregator of Runs. EDGAR can
+be used to lazily run POET and do much of the analysis with minimal
+intervention. 
+
+In order to run EDGAR, you will need to have filled out the 'event',
+'centering', 'photometry', and 'params' sections of the eventname.pcf, the
+p10.pcf, and initvals.txt, all in the run directory. Now we will fill
+out poet.pcf in the root directory (above the run directory). There
+are two sections, POET:
+\begin{itemize}
+\item rundir -- the name of the directory to run EDGAR on, usually the
+  same as eventname
+\item eventname -- the event code of the observation, usually the same
+  as rundir.
+\end{itemize}
+and EDGAR which is used exclusively by EDGAR:
+\begin{itemize}
+\item memory -- the amount of memory to allow EDGAR to use in MB
+\item cores -- the maximum number of cores for EDGAR to use
+\item test\_centering -- centering directory to test models on
+\item test\_photometry -- photometry directory to test models on
+\item model -- this parameter is interpreted as a two dimensional
+  array where each line is a set of models. Each line after model
+  (which includes sets of models) must be indented at least one space.
+\item runp6 -- True/False, whether or not to run p6
+\item runp7\_10 -- True/False, whether or not to run p7 through p10
+\item runzen -- True/False, whether or not to run ZEN
+\item zenmodels -- list of model set to run zen on
+\item zenchains -- number of chains to use when running ZEN
+\item zenmaxbinsize -- maximum bin size used in ZEN. Ignore unless zen
+  spits out a error about maximum bin sizes. If it does, set this
+  value according to that error output.
+\end{itemize}
+
+EDGAR will run p1-5 on all the centering and photometry specified in
+their respcetive sections of eventname.pcf. The After running all the
+aperture and photometry, p6 will be run multiple times in different
+phases:
+
+In every phase excpet the final phase (init, full, check), 'mcmc' and
+'chi2scale' are disabled. In the final phase, these are enabled. These
+two settings as well as 'model' are the only setting overwritten in
+the 'params' section of eventname.pcf by EDGAR.
+
+In 'init' phase, the specified models are compared on the
+test\_centering and test\_photometry specified in poet.pcf. In 'full'
+phase, the model found in 'init' phase is run on all
+centering/photometry to find the best centering/photometry. In the
+'check' phase, all models are rerun on the centering/photometry chosen
+in the 'full' phase to ensure that a different model does not fit
+better. In 'final' phase, the best centering/photometry/model is rerun
+with a larger number of iterations. The best
+centering/photometry/model will be printed out in the end.
+
+After p6 is run in its various phases, p7 through p10 will be
+run. After this, if `runzen` is ``True'', ZEN is run on all specified
+`zenmodels`. Currently, the items listed in zenmodels are strings
+coresponding to zen configuration files. There are a few default model
+sets (noramp, linramp, quadramp), however, if you would like to run a
+particular custom model set, it must be named ``zen\_<model>.cfg'' in
+your run directory where ``<model>'' is one of the values you specify
+for `zenmodels` poet.pcf.
+
+NOTE: running ZEN will change configuration files, leaving
+configuration files that reflect what was actually run. Only the
+event, centering, and photometry sections of eventname.pcf,
+zen\_<model>.cfg, poet.pcf, initvals.txt, and p10.pcf affect an EDGAR
+run. To run EDGAR:
+
+\begin{verbatim}
+poet.py ed
+\end{verbatim}
+
+\section{Diagnosing by Loading the Event Object}
+\subsection{p1 through p5}
+At some point you will inevitably run into trouble, either with the
+code or something specific to your data set. Fortunately, you can load
+the event object, which contains all useful variables, into a python
+session and examine it to look for problems. First, navigate to your
+/run/ directory. Then launch a python 3 session
+
+\begin{verbatim}
+ipython3
+\end{verbatim}
+
+Once you have an interactive session going, we need to import some POET
+codes to load the event object. Copy and paste the following code
+into your session:
+
+\begin{verbatim}
+import sys
+sys.path.append('lib/')
+import manageevent as me
+\end{verbatim}
+
+You now have the manageevent module accessible in your session. At
+this point, the command you use will differ, depending on which file
+you wish to load. Each module of POET (p1, p2, etc.) produces an
+output file which contains the event object. They are named according
+to your event name and the module which produced them.
+
+To load p1, assuming your ``run'' directory is wa012bs12 (adjust accordingly for other ``run'' directories)
+
+\begin{verbatim}
+event = me.loadevent('wa012bs12/wa012bs12_ini')
+\end{verbatim}
+
+To load p2:
+
+\begin{verbatim}
+event = me.loadevent('wa012bs12/wa012bs12_bpm')
+\end{verbatim}
+
+To load p3, assuming you used fgc for your centering method (adjust accordingly
+for other methods):
+
+\begin{verbatim}
+event = me.loadevent('wa012bs12/fgc/wa012bs12_ctr')
+\end{verbatim}
+
+To load p4, assuming you used fgc for you centering method and a constant
+aperture radius of 2.5 with sky annulus radii of 7 and 15 pixels (adjust
+accordingly to your run):
+
+\begin{verbatim}
+event = me.loadevent('wa012bs12/fgc/ap250+000/wa012bs12_pht')
+\end{verbatim}
+
+To load p5, with the same assumptions as above (adjust according to your run):
+
+\begin{verbatim}
+event = me.loadevent('wa012bs12/fgc/ap250+000/wa012bs12_p5c')
+\end{verbatim}
+
+Note that me.loadevent does not, by default, load the entire data array
+for memory concerns. If you need the data, uncertainties, or full
+data mask, you can set these in a keyword argument, like so:
+
+\begin{verbatim}
+event = me.loadevent('wa012bs12/fgc/ap250+000/wa012bs12_p5c', load=['data','uncd','mask'])
+\end{verbatim}
+
+\subsection{p6 and p7}
+p6 and p7 use a different function to load the event object because
+they have added a fit object. For p6, from the top directory
+(containing poet.py) do the following, replacing MODELDIR with the
+location of the p6 output:
+
+\begin{verbatim}
+import sys
+sys.path.append('lib')
+import run
+events = run.p6Restore('wa012bs12/fgc/ap2500715/MODELDIR')
+\end{verbatim}
+
+Loading the p7 output is very similar. From the same location, do the following
+(again replacing MODELDIR):
+
+\begin{verbatim}
+events = run.p7Restore('wa012bs12/fgc/ap2500715/MODELDIR')
+\end{verbatim}
+
+Note that these functions, unlike me.loadevent, return a list of event
+objects, even if you just loaded one.
+
+\subsection{ZEN}
+ZEN uses the same functions as p6 when saving and loading the event object.
+
+\subsection{Interpreting the Event Object}
+You now have a variable 'event' (or a list, 'events') which contains
+all the products of POET. Some useful variables:
+
+\begin{itemize}
+\item event.fp -- This object contains the frame parameters (hence
+  'fp'). Every value that is calculated or supplied on a
+  frame-by-frame basis should be found here. Examples include:
+  event.fp.x and event.fp.y, which are the centering positions of the
+  target; event.fp.aplev, the raw photometry; and event.fp.aperr, the
+  photometry uncertainty.
+
+\item event.fit -- This object is a list contains the results of all model fits.
+  Note that even if you only fit one model, event.fit will still be a list.
+
+\item event.phase -- Time of each frame, converted to units of orbital phase.
+
+\item event.params -- Object containing all params set in p6.
+\end{itemize}
+
+For example, if I wanted to plot the position of the target as a function
+of time, I might do the following:
+
+\begin{verbatim}
+import sys
+import matplotlib.pyplot as plt
+sys.path.append('lib/')
+import manageevent as me
+event = me.loadevent('wa012bs12/fgc/ap250+000/wa012bs12_p5c')
+plt.plot(event.phase, event.fp.x[0])
+plt.show()
+\end{verbatim}
+
+Occasionally you may want to take a closer look at a POET plot. Most
+of them can be recreated in an interactive session as long as you
+have the event object loaded and know where the function that generated
+the plot is located. For example, the p6 plots are made by function
+in lib/plots.py. If you wanted to recreate the normalized light curve
+plot, you might do something like the following:
+
+\begin{verbatim}
+import sys
+import matplotlib.pyplot as plt
+sys.path.append('lib')
+import run
+event = run.p6Restore('wa012bs12/fgc/ap250+000/p6output/')
+import plots
+plots.normlc(event[0], event[0].fit[0], 1)
+plt.show()
+\end{verbatim}
+
+Note that you could make any changes to the plot that you wanted
+between the calls to normlc() and plt.show().
+
+The following is a far-from-complete list of useful attributes. If the
+attribute does not exist, it is probably created by a module that you
+have not run yet. There are hundreds of variables contained within the
+event object. If you find some useful that you think may benefit
+future users of POET, I encourage you to add them here.
+
+\begin{itemize}
+\item event.fp -- Frame Parameters object. Most parameters that are defined
+  on a frame-by-frame basis are stored here. Shapes of contained arrays
+  are generally npos by maxnimpos, where maxnimpos is the maximum number
+  of frames taken at any particular image.
+  \begin{itemize}
+  \item event.fp.aplev -- Flux per frame.
+  \item event.fp.apraw -- Flux per frame, without background subtraction.
+  \item event.fp.x -- X position of the target on the detector.
+  \item event.fp.y -- Y position of the target on the detector.
+  \item event.fp.noisepix -- Noise pixels per frame.
+  \item event.phase, event.fp.phase -- Time per frame in units of orbital phase.
+  \item event.bjdtdb, event.fp.bjdtdb -- Time per frame in BJD$_{\textrm{TDB}}$
+  \end{itemize}
+\item event.fit -- A fit object, or list of fit objects, which contain
+  the results of p6 or ZEN. Every set of models gets a separate fit
+  object within the corresponding event object. For the following
+  attributes, I will assume that event.fit is a single instance of a
+  fit object. In real applications, you will need to index to get the
+  fit object you want (in most cases, replace fit with fit[0]).
+  \begin{itemize}
+  \item event.fit.bestp -- Best-fitting parameters.
+  \item event.fit.normsigma -- Clipped normalized uncertainties.
+  \item event.fit.normsigmauc -- Unclipped normalized uncertainties. This
+    pattern of adding 'uc' to variable names to get the unclipped version
+    applies in many cases.
+  \item event.fit.normbinflux -- Binned, clipped, normalized flux.
+  \item event.fit.normbinstd -- Binned, clipped, normalized flux uncertainty.
+  \item event.fit.normbestfit -- Normalized best-fit model.
+    \item event.fit.binbjdtdb -- Binned BJD$_{\textrm{TDB}}$.
+  \item event.fit.residuals -- Model fit residuals.
+  \item event.fit.bestip -- Best-fit intrapixel model.
+  \end{itemize}
+\end{itemize}
+  
+
+\section{Testing POET}
+This section gives the commands to run POET through its entirety,
+for testing when making changes to the code.
+
+Clone the POET repository:
+
+\begin{verbatim}
+git clone --recursive /home/esp01/git/poet.git POET/
+\end{verbatim}
+
+Rename the run directory to easily keep track of output
+
+\begin{verbatim}
+cd POET
+mv run wa012bs12
+\end{verbatim}
+
+Build various c modules, documents, submodules, etc.
+
+\begin{verbatim}
+make
+\end{verbatim}
+
+Copy the necessary inputs from the test directory:
+
+\begin{verbatim}
+cp /home/esp01/events/POET-test/wa012bs12/*.pcf  wa012bs12/
+\end{verbatim}
+
+Set the proper run directory in poet.pcf
+
+\begin{verbatim}
+cp /home/esp01/events/POET-test/poet-wa012bs12.pcf poet.pcf
+\end{verbatim}
+
+Run p1 - p5. Note that this will use ~5 cores (can be adjusted in
+wa012bs12.pcf). Run this before testing EDGAR as EDGAR will change
+configuration files around.
+
+\begin{verbatim}
+./poet.py p1
+\end{verbatim}
+
+Copy initval file from the test directory
+
+\begin{verbatim}
+cp /home/esp01/events/POET-test/wa012bs12/*-initvals.txt wa012bs12/
+\end{verbatim}
+
+Copy ZEN config file from test directory
+
+\begin{verbatim}
+cp /home/esp01/events/POET-test/wa012bs12/*.cfg wa012bs12/
+\end{verbatim}
+
+Run p6
+
+\begin{verbatim}
+poet.py p6 outdir=p6output
+\end{verbatim}
+
+This will create a new directory in each photometry directory yo
+specified in the p6 section of your eventname.pcf file with your p6
+output, named p6output. Replace P6DIR with this directory, plus the
+cent/phot directory. E.g. fgc/ap2500715/p6output
+
+Run p7 - p9 and p12:
+
+\begin{verbatim}
+poet.py p7  <P6DIR>
+poet.py p8  <P6DIR>
+poet.py p9  <P6DIR>
+poet.py p10 <p6DIR>
+\end{verbatim}
+
+Run zen
+
+\begin{verbatim}
+poet.py zen wa012bs12/zen.cfg
+\end{verbatim}
+
+Now repeat the above for a different WASP-12b observation so that
+we can do a joint fit:
+
+\begin{verbatim}
+mkdir wa012bs22
+cp /home/esp01/events/POET-test/wa012bs22/*.pcf wa012bs22/
+cp /home/esp01/events/POET-test/poet-wa012bs22.pcf poet.pcf
+./poet.py p1
+cp /home/esp01/events/POET-test/wa012bs22/*-initvals.txt wa012bs22/
+cp /home/esp01/events/POET-test/wa012bs22/*.cfg wa012bs22/
+poet.py p6
+poet.py p7  <P6DIR>
+poet.py p8  <P6DIR>
+poet.py p9  <P6DIR>
+poet.py p10 <p6DIR>
+poet.py zen wa012bs22/zen.cfg
+\end{verbatim}
+
+Make a directory for joint fits and copy the required files.
+
+\begin{verbatim}
+mkdir -p joint/fgc/ap2500715
+cp wa012bs12/fgc/ap2500715/*.dat joint/fgc/ap2500715
+cp wa012bs22/fgc/ap2500715/*.dat joint/fgc/ap2500715
+cp /home/esp01/events/POET-test/joint/*.pcf joint/
+cp /home/esp01/events/POET-test/joint/*-initvals.txt joint/
+cp /home/esp01/events/POET-test/poet-joint.pcf poet.pcf
+\end{verbatim}
+
+Run the joint fit
+
+\begin{verbatim}
+poet.py p6
+\end{verbatim}
+
+Compare outputs to the results in /home/esp01/events/POET-test.
+
+Now test EDGAR. EDGAR handles many aspects of the configuration files
+for the user, and will replace those that were copied above. EDGAR,
+for the most part, executes POET in the same way as above, but changes
+to EDGAR should still be tested.
+
+\begin{verbatim}
+poet.py ed
+\end{verbatim}
+
+Compare outputs to the results in /home/esp01/events/POET-test.
+
+\end{document}
+
+
