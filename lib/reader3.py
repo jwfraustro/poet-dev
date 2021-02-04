@@ -1,6 +1,6 @@
 """
     This class loads a control file (pcf) and lets you
-    querry the parameters and values.
+    query the parameters and values.
 
     Constructor Parameters:
     -----------------------

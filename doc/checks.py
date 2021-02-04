@@ -30,12 +30,12 @@ import poet_5checks as p5
 import poet_denoise as pd
 
 # Change evtname accordingly to your event name.
-p1.Event(         'evtname.pcf')
+p1.Event(         'evtname.psf')
 p2.badpix(        'evtname_ini')
-pd.run_denoising( 'evtname_bpm', 'denoise.pcf')
-#p3.run_centering( 'evtname_bpm', 'center.pcf')
-p3.run_centering( 'evtname_den', 'center.pcf')
-p4.run_photometry('evtname_ctr', 'photom.pcf')
+pd.run_denoising( 'evtname_bpm', 'denoise.psf')
+#p3.run_centering( 'evtname_bpm', 'center.psf')
+p3.run_centering( 'evtname_den', 'center.psf')
+p4.run_photometry('evtname_ctr', 'photom.psf')
 p5.checks(        'evtname_pht')
 
 

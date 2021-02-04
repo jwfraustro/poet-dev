@@ -6,7 +6,7 @@ rundir    run
 # the base name of the pcf file in the run directory)
 # If running a joint fit, this must match a pcf file. POET
 # will use the [p6] section of this file for the joint fit.
-eventname wa012bs12
+eventname hd209bs24
 
 [EDGAR]
 # config for EDGAR to use.

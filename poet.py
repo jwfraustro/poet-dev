@@ -8,7 +8,7 @@ TO EXECUTE, USE THE FOLLOWING SYNTAX:
 
 ./poet.py p1
     Description:
-            Reads in inital data and saves to a file
+            Reads in initial data and saves to a file
 
 ./poet.py p2
     Description:
@@ -18,7 +18,7 @@ TO EXECUTE, USE THE FOLLOWING SYNTAX:
     Description:
             Preforms centering                                               #
     directory:
-            Default: currect working directory
+            Default: current working directory
             If specified, run p3 on given directory using the 'center.pcf'
               in that directory.
 
@@ -57,12 +57,12 @@ TO EXECUTE, USE THE FOLLOWING SYNTAX:
               cache in the run directory and are plotted in plots (parallel
               to run.)
             If given, runs p6 on the given directory. Plots will NOT be made
-              untill you run './poet.py p6 justplot=True' (which will only
+              until you run './poet.py p6 justplot=True' (which will only
               plot output specified in p6.pcf.)
     modeldir:
             Default: None
-            This specifes the name of the output directory for p6.
-            If not specifed, the output directory will be named by the date
+            This specifies the name of the output directory for p6.
+            If not specified, the output directory will be named by the date
               regardless of the value of nodate.
             This value overrides the modeldir value given in p6.pcf
     clip:
@@ -74,7 +74,7 @@ TO EXECUTE, USE THE FOLLOWING SYNTAX:
                                                                              #
     mode:
             Default: full
-            If full, runs in burn folwed by a run in final
+            If full, runs in burn followed by a run in final
             If burn,
             If final,
             If continue,
@@ -292,7 +292,7 @@ def formt(val):
     """
     Turns string into float/int/True/False/None if need be.
     """
-    # if val is a list, reccursively format the list
+    # if val is a list, recursively format the list
     if isinstance(val, (list, tuple)):
         return [formt(elt) for elt in val]
 

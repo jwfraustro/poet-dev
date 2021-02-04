@@ -96,7 +96,7 @@ def apphot(image,  ctr,  photap,  skyin,    skyout,
     -------
       This function returns the flux within Photap pixels of
       [Cx,Cy], after subtracting the average per-pixel flux in the
-      sky annulus.  See POCEDURE for details of the calculation.
+      sky annulus.  See PROCEDURE for details of the calculation.
 
     Notes
     -----

@@ -259,7 +259,7 @@ class Event(Univ):
     #for aornum in range(self.naor):
     for aornum in (i for i, atype in enumerate(self.aortype) if atype == 0):
       dir = self.dpref + self.aorname[aornum] + self.inst.bcddir
-      frameslist = os.listdir(dir)
+      frameslist = os.listdir(os.path.abspath(dir))
       framesstring = '\n'.join(frameslist) + '\n'
 
       # find the data files
