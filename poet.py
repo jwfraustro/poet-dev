@@ -169,7 +169,7 @@ def poet(func, *args, **kwargs):
         poetpcf = kwargs.pop("poetpcf")
     else:
         poetpcf = rd.read_pcf("poet.pcf", 'POET', simple=True)
-    rundir    = os.path.abspath(poetpcf.rundir)
+    rundir    = os.path.relpath(poetpcf.rundir)
     eventname = poetpcf.eventname
 
     # extract key-word arguments from args
@@ -190,7 +190,7 @@ def poet(func, *args, **kwargs):
 
     # find proper directory to run in
     if len(args) > 0 and func != "zen":
-        directory = '/'.join([rundir, args.pop(0)])
+        directory = os.path.relpath(os.path.join(rundir, args.pop(0)))
     else:
         directory = rundir
     directory = os.path.abspath(directory)

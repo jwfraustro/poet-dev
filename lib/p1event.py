@@ -29,6 +29,7 @@ class Event(Univ):
 
     owd = os.getcwd()
     os.chdir(cwd)
+    print(os.chdir(cwd))
     tini = time.time()
 
     # Open new log based on the file name
@@ -74,7 +75,7 @@ class Event(Univ):
     # Read Planet Parameters From TepFile
     # ccampo 5/27/2011:
     # origtep is a tepfile with its original units (not converted)
-    self.origtep      = tc.tepfile(pcf.tepfile[0], conv=False)
+    self.origtep      = tc.tepfile(os.path.relpath(pcf.tepfile[0]), conv=False)
     tep               = tc.tepfile(pcf.tepfile[0])
     self.tep          = tep
     self.ra           = tep.ra.val
@@ -139,7 +140,7 @@ class Event(Univ):
     # Directories
     self.topdir    = pcf.topdir[0]
     self.datadir   = pcf.datadir[0]
-    self.dpref     = ( self.topdir + '/'  + self.datadir + '/' + 
+    self.dpref     = (self.datadir + '/' +
                        self.sscver + '/r' )
 
     # aors
@@ -258,7 +259,7 @@ class Event(Univ):
     self.bcdfiles = []
     #for aornum in range(self.naor):
     for aornum in (i for i, atype in enumerate(self.aortype) if atype == 0):
-      dir = self.dpref + self.aorname[aornum] + self.inst.bcddir
+      dir = os.path.relpath(os.path.join(self.dpref + self.aorname[aornum] + self.inst.bcddir))
       frameslist = os.listdir(dir)
       framesstring = '\n'.join(frameslist) + '\n'
 
@@ -291,7 +292,7 @@ class Event(Univ):
       # of hours of observation....). Will not work if nnod > 1
       if self.ndcenum == 0:
         if self.nexpid[aornum] != len(self.bcdfiles[0]):
-          self.nexpid[aornum] = len(slef.bcdfiles[0])
+          self.nexpid[aornum] = len(self.bcdfiles[0])
           print("WARNING: Possible missing files detected. Adjusting nexpid.")
 
     # List of preflash calibration AORs:
@@ -324,7 +325,7 @@ class Event(Univ):
 
     # pick a random image, not the first
     file = bcdfiles[-2]
-    data, head = fits.getdata(dir + file, header=True,
+    data, head = fits.getdata(os.path.join(dir, file), header=True,
                               ignore_missing_end=True)
 
     # data size
@@ -431,7 +432,7 @@ class Event(Univ):
     image[np.where(np.isfinite(image) != True)] = 0
     plt.figure(101, (10,9))
     plt.clf()
-    plt.imshow(image, interpolation='nearest', origin='ll', cmap=plt.cm.gray)
+    plt.imshow(image, interpolation='nearest', origin='lower', cmap=plt.cm.gray)
     plt.plot(self.srcest[1,:], self.srcest[0,:],'r+')
     plt.xlim(0,self.nx-0.5)
     plt.ylim(0,self.ny-0.5)

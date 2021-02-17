@@ -11,6 +11,7 @@ Revisions
 """
 import numpy as np
 import sexa2dec as s2d
+import os
 
 # constants
 rsun   = 6.95508e8   # solar radius, m,    Wikipedia
@@ -47,6 +48,7 @@ class tepfile:
         self.fname = filename  # filename of the tepfile
         
         # tepfile version number; needed to understand how to parse
+        print(os.getcwd())
         tepin  = open(filename, 'r')
         lines  = tepin.readlines()
         verstr = lines[1]

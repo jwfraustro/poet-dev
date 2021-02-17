@@ -96,7 +96,7 @@ same working directory (start EDGAR, edit configs, start another EDGAR)
         return ()
 
     # change config to not run next portions on their own
-    pcfname = poetpcf.rundir+'/'+poetpcf.eventname+'.pcf'
+    pcfname = os.path.relpath(os.path.join(poetpcf.rundir, poetpcf.eventname+'.pcf'))
     eventpcf = open(pcfname, 'r').readlines()
     for i, line in enumerate(eventpcf):
         for num in ('2', '3', '4', '5'):
@@ -371,8 +371,8 @@ tuple
 
 Notes
 -----
-This function will edit eventname.pcf and replace the [p6] and
-[params] sections. After p6 is run, it will return eventname.pcf to
+This function will edit hd209bs24.pcf and replace the [p6] and
+[params] sections. After p6 is run, it will return hd209bs24.pcf to
 its original state, but will put the sections that were used in the
 files params_init.pcf and p6_init.pcf as a record of what was done
 
@@ -500,8 +500,8 @@ tuple
 
 Notes
 -----
-This function will edit eventname.pcf and replace the [p6] and
-[params] sections. After p6 is run, it will return eventname.pcf to
+This function will edit hd209bs24.pcf and replace the [p6] and
+[params] sections. After p6 is run, it will return hd209bs24.pcf to
 its original state, but will put the sections that were used in the
 files params_full.pcf and p6_full.pcf as a record of what was done
 
@@ -631,8 +631,8 @@ tuple
 
 Notes
 -----
-This function will edit eventname.pcf and replace the [p6] and
-[params] sections. After p6 is run, it will return eventname.pcf to
+This function will edit hd209bs24.pcf and replace the [p6] and
+[params] sections. After p6 is run, it will return hd209bs24.pcf to
 its original state, but will put the sections that were used in the
 files params_check.pcf and p6_check.pcf as a record of what was done
 
@@ -777,8 +777,8 @@ tuple
 
 Notes
 -----
-This function will edit eventname.pcf and replace the [p6] and
-[params] sections. After p6 is run, it will return eventname.pcf to
+This function will edit hd209bs24.pcf and replace the [p6] and
+[params] sections. After p6 is run, it will return hd209bs24.pcf to
 its original state, but will put the sections that were used in the
 files params_final.pcf and p6_final.pcf as a record of what was done
 
@@ -1250,9 +1250,9 @@ def guessp1size(poetpcf):
     naor       = np.size(aornames[np.where(aortypes == 0)])
     nexpid     = np.empty(naor, np.long)
     for i, aorname in enumerate(aornames[:naor]):
-        bcddir = '/'.join([pcf.topdir[0], pcf.datadir[0],
+        bcddir = os.path.join(*[*pcf.topdir[0].split("/"), *pcf.datadir[0].split("/"),
                            pcf.sscver[0], 'r'+str(aorname),
-                           instru.bcddir])
+                           *instru.bcddir.split("/")])
         files = sorted([f for f in os.listdir(bcddir)
                         if f.endswith(instru.bcdsuf)])
         first, last = files[0], files[-1]

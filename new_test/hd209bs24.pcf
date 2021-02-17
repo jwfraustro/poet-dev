@@ -2,41 +2,41 @@
 # Edit the values, such they correspond to your event
 
 # "official" planet name, with any spaces, for plot titles, e.g., HD 209458b
-planetname   PLANET NAME
+planetname   HD 209458b
 
 
 # Event:
-planet       YYXXXz        # 6-letter code of transiting planet
+planet       hd209b        # 6-letter code of transiting planet
 ecltype      s             # s=secondary, p=primary  eclipse, o=orbit 
-photchan     1             # Spitzer photometry channel
-visit        1             # serial number of this Spitzer "visit"
+photchan     2             # Spitzer photometry channel
+visit        4             # serial number of this Spitzer "visit"
 comment      None          # leave as 'None' to omit comment in event name
 
 
 # Tepfile location (starting from /home/...):
-tepfile   /home/esp01/obsprep/planetwork/planet/TEPFILE.tep
+tepfile  obsprep/TEP/hd209458b.tep
 
 
 # Location of the data, relative to topdir (see below):
-datadir      data/YEAR-Spitzer-XX/EVENT
+datadir      data/2014-Spitzer-Lewis/hd209bs24
 
 
 # Spitzer pipeline version:
-sscver       SXX.YY.Z
+sscver       S19.2.0
 
 
 # AORs: Enter as many AOR key numbers as there are:
 # In aortype indicate the type: 0=data, 1=precalibration, 2=postcal.
-aorname      12345678 7777777 98765432   
-aortype      0        0       0   
+aorname      50490880
+aortype      0
 
 
 # Permanently bad pixel mask (relative to: /home/esp01/data/.../cal/):
-pmaskfile    FILE_pmask.fits              
+pmaskfile    feb14_ch2_bcd_pmask_subarray.fits
 
 
 # Kurucz model for star (relative to: kuruczdir):
-kuruczfile   KURUCZFILE.pck
+kuruczfile   hd209458b-fp00k2odfnew.pck
 
 
 # PSF file, for aperture correction and/or PSF fitting. 
@@ -70,8 +70,8 @@ szchunk  64
 sigma    4.0  4.0
 
 #Run p2 and p3 immediately after p1:
-runp2 True
-runp3 True
+runp2 False
+runp3 False
 
 # Override variables:
 # -------------------
@@ -92,7 +92,7 @@ userrej   None
 fluxunits True
 
 # project directory
-topdir    /home/esp01/
+topdir    new_test/
 
 # ancil directories relative to project dir
 leapdir    ancil/leapseconds/
@@ -136,7 +136,7 @@ weights     False     # Use uncertainties as weights for fit.
 fitbg       1
 
 # Run p4 immediately after:
-runp4  True
+runp4 False
 
 # Least asymmetry parameters:
 cradius     7.0     
@@ -190,7 +190,7 @@ apscale     5        # Interpolation rescaling factor.
 psfexpand   5        # PSF-data pixel scale ratio.
 
 # Run p5 immediately after:
-runp5 True
+runp5 False
 
 # Optimal photometry parameters:
 otrim       8        # Radius of trimmed box around the target.
@@ -231,7 +231,7 @@ threads    1
 planetname      Example-b
 
 # Name of file(s) containing initial parameter values
-modelfile       wa012bs12-initvals.txt # should have form 'wa012bs12-initvals.txt'
+modelfile       hd209bs24-initvals.txt # should have form 'wa012bs12-initvals.txt'
 
 # SPECIFY OUTPUT FILE FOR print STATEMENTS
 # You can no longer use sys.stdout for standard output (to screen)

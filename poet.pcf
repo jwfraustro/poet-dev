@@ -1,12 +1,12 @@
 [POET]
 # the name of the run directory you would like to use
-rundir    run
+rundir    new_test
 
 # the event-code of the observation (often the same as rundir, must be
 # the base name of the pcf file in the run directory)
 # If running a joint fit, this must match a pcf file. POET
 # will use the [p6] section of this file for the joint fit.
-eventname wa012bs12
+eventname hd209bs24
 
 [EDGAR]
 # config for EDGAR to use.
@@ -19,8 +19,8 @@ cores   10
 
 # Test centering and photometry. This centering and photometry will be used
 # to determine the best model.
-test_centering fgc
-test_photometry ap250+000
+test_centering lag
+test_photometry ap275+000
 
 # model sets for p6 to try. One line for each set of models
 p6model         mandelecl linramp bilinint
