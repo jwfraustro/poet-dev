@@ -31,7 +31,7 @@ def photometry(event, pcf, photdir, mute, owd):
   log.writelog("\nStart " + photdir + " photometry: " + time.ctime())
 
   parentdir = os.getcwd() + "/"
-  os.chdir(photdir)
+  #os.chdir(photdir)
 
   # Parse the attributes from the control file to the event:
   attrib = vars(pcf)
@@ -512,7 +512,7 @@ def photometry(event, pcf, photdir, mute, owd):
                  "  (" + photdir + ")")
   print("--------------  ------------\n")
 
-  os.chdir(owd)
+  #os.chdir(owd)
 
   if event.runp5:
       os.system("python3 poet.py p5 %s/%s"%(event.centerdir, event.photdir))
@@ -526,7 +526,7 @@ def run_photometry(eventname, cwd):
   """
 
   owd = os.getcwd()
-  os.chdir(cwd)
+  #os.chdir(cwd)
   config = os.path.basename(eventname)[:-4] + '.pcf'
   pcfs = rd.read_pcf(config, 'photometry')
 
@@ -559,7 +559,7 @@ def run_photometry(eventname, cwd):
     if cwd[-len(photdir):] == photdir:
       # Go to dir where poet3 files were saved.
       cwd = cwd[:-len(photdir)]
-      os.chdir(cwd)
+      #os.chdir(cwd)
 
     mute = False  # print to screen
 
@@ -617,7 +617,7 @@ def run_photometry(eventname, cwd):
     p = Process(target=photometry, args=(this_event, pcf, photdir, mute, owd))
     p.start()
 
-  os.chdir(owd)
+  #os.chdir(owd)
 
 def do_aphot(start, end, event, log, mute, aplev, aperr, nappix, skylev, skyerr,
              nskypix, nskyideal, status, good, datatype):

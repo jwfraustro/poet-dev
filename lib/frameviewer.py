@@ -59,9 +59,9 @@ def frameviewer(event, zoom=True, expand=14, scale=100.0):
     dummy = event.data[0,0,0,0]
   except:
     curdir = os.getcwd()
-    os.chdir(event.eventdir + '/' + event.centerdir)
-    updateevent(event, event.eventname + "_ctr", ['data', 'mask'])
-    os.chdir(curdir)
+    #os.chdir(event.eventdir + '/' + event.centerdir)
+    updateevent(event, os.path.join(event.topdir, event.centerdir, event.eventname + "_ctr"), ['data', 'mask'])
+    #os.chdir(curdir)
 
   # Look for phtometry apertures:
   try:

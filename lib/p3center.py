@@ -29,7 +29,7 @@ Modification History:
 
 def centering(event, pcf, centerdir, owd):
   
-  os.chdir(centerdir)
+  #os.chdir(centerdir)
 
   tini = time.time()
 
@@ -151,12 +151,14 @@ def centering(event, pcf, centerdir, owd):
   for nc in range(event.ccores):
     start =  nc    * chunksize # Starting index to process
     end   = (nc+1) * chunksize # Ending   index to process
+
     proc = Process(target=do_center, args=(start, end, event, centermask, log,
                                            x,    y, flux, sky, goodfit,
                                            xerr, yerr, xsig, ysig, noisepix,
                                            rot))
     processes.append(proc)
     proc.start()
+
   # Make sure all processes finish their work:
   for nc in range(event.ccores):
     processes[nc].join()
@@ -188,10 +190,10 @@ def centering(event, pcf, centerdir, owd):
   # Save
   print("\nSaving")
   if event.denoised:
-    me.saveevent(event, event.eventname + "_ctr", save=['dendata', 'data',
+    me.saveevent(event, os.path.join(event.topdir, event.centerdir, event.eventname + "_ctr"), save=['dendata', 'data',
                                                         'uncd', 'mask'])
   else:
-    me.saveevent(event, event.eventname + "_ctr", save=['data', 'uncd', 'mask'])
+    me.saveevent(event, os.path.join(event.topdir, event.centerdir, event.eventname + "_ctr"), save=['data', 'uncd', 'mask'])
 
   # Print time elapsed and close log:
   cwd = os.getcwd()
@@ -207,7 +209,7 @@ def centering(event, pcf, centerdir, owd):
                  "  (" + event.centerdir + ")")
   print("-------------  ------------\n")
 
-  os.chdir(owd)
+  #os.chdir(owd)
 
   if event.runp4:
       os.system("python3 poet.py p4 %s"%event.centerdir)
@@ -221,9 +223,9 @@ def run_centering(eventname, cwd):
   """
 
   owd = os.getcwd()
-  os.chdir(cwd)
+  #os.chdir(cwd)
   config = os.path.basename(eventname)[:-4] + '.pcf'
-  pcfs = rd.read_pcf(config, 'centering')
+  pcfs = rd.read_pcf(os.path.join(cwd, config), 'centering')
 
   if len(pcfs) == 1: #, I may be in the center dir, to re-run: 
     # Get name of centering dir:
@@ -235,14 +237,14 @@ def run_centering(eventname, cwd):
     if cwd[-len(centerdir):] == centerdir:
       # Go to dir where poet2 files were saved.
       cwd = cwd[:-len(centerdir)]
-      os.chdir(cwd)
+      #os.chdir(cwd)
 
   # Load the event:
   try:
-    event = me.loadevent(eventname, load=['dendata', 'data','uncd','mask'])
+    event = me.loadevent(os.path.join(cwd, eventname), load=['dendata', 'data','uncd','mask'])
     print("Performing centering on denoised data")
   except:
-    event = me.loadevent(eventname, load=['data','uncd','mask'])
+    event = me.loadevent(os.path.join(cwd, eventname), load=['data','uncd','mask'])
 
   # Loop over each run:
   for pcf in pcfs:
@@ -262,15 +264,15 @@ def run_centering(eventname, cwd):
 
     # copy the photometry and centering configuration into the
     # centering directory
-    filename = centerdir + '/' + event.eventname + '.pcf'
+    filename = str(os.path.join(centerdir, event.eventname + '.pcf'))
     pcf.make_file(filename, 'centering')
     rd.copy_config(config, ['photometry'], filename)
 
     # Launch the thread:
     p = Process(target=centering, args=(this_event, pcf, centerdir, owd))
     p.start()
-
-  os.chdir(owd)
+    p.join()
+  #os.chdir(owd)
 
 
 def do_center(start, end, event, centermask, log, x, y, flux, sky, goodfit, xerr, yerr, xsig, ysig, noisepix, rot):

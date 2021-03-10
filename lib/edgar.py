@@ -211,8 +211,8 @@ edpcf   = rd.read_pcf("poet.pcf", "EDGAR", simple=True,
     returnPrint("mask")
 
     # file size in bytes
-    datsize = os.path.getsize('/'.join([poetpcf.rundir, poetpcf.eventname+"_ini.dat"]))
-    h5size  = os.path.getsize('/'.join([poetpcf.rundir, poetpcf.eventname+"_ini.h5" ]))
+    datsize = os.path.getsize(os.path.join(poetpcf.rundir, poetpcf.eventname+"_ini.dat"))
+    h5size  = os.path.getsize(os.path.join(poetpcf.rundir, poetpcf.eventname+"_ini.h5" ))
     # total size in MB
     p2size = 200 + (datsize + h5size)/1024**2
     
@@ -262,8 +262,8 @@ edpcf   = rd.read_pcf("poet.pcf", "EDGAR", simple=True,
     config = poetpcf.eventname+'.pcf'
 
     # get pcfs and queue up tasks
-    cpcfs = rd.read_pcf(poetpcf.rundir+"/"+config, 'centering')
-    ppcfs = rd.read_pcf(poetpcf.rundir+"/"+config, 'photometry')
+    cpcfs = rd.read_pcf(os.path.join(poetpcf.rundir, config), 'centering')
+    ppcfs = rd.read_pcf(os.path.join(poetpcf.rundir, config), 'photometry')
     p3tasks = []
     p4tasks = []
     p5tasks = []
@@ -271,10 +271,10 @@ edpcf   = rd.read_pcf("poet.pcf", "EDGAR", simple=True,
 
         # make directory and place pcfs
         center = cpcf.method if cpcf.pcfname is None else cpcf.method + '_' + cpcf.pcfname
-        cdir = poetpcf.rundir+'/'+center
+        cdir = os.path.join(poetpcf.rundir, center)
         os.makedirs(cdir, exist_ok=True)
-        cpcf.make_file(cdir+'/'+config, "centering")
-        rd.copy_config(poetpcf.rundir+'/'+config, 'photometry', cdir+'/'+config)
+        cpcf.make_file(os.path.join(cdir, config), "centering")
+        rd.copy_config(os.path.join(poetpcf.rundir, config), 'photometry', os.path.join(cdir, config))
 
         # add task
         p3task = Task(poetpcf.rundir, poetpcf.eventname, cpcf.ccores, poet.p, args=(3, center), kwargs={"poetpcf":poetpcf})
@@ -288,9 +288,9 @@ edpcf   = rd.read_pcf("poet.pcf", "EDGAR", simple=True,
                     continue
             # make photometry directory and place pcfs
             photom = photname(ppcf)
-            pdir = cdir+'/'+photom
+            pdir = os.path.join(cdir, photom)
             os.makedirs(pdir, exist_ok=True)
-            ppcf.make_file(pdir+'/'+config, "photometry")
+            ppcf.make_file(os.path.join(pdir, config), "photometry")
 
             # add photometry tasks to queue
             p4task = Task(poetpcf.rundir, poetpcf.eventname, ppcf.ncores, poet.p,

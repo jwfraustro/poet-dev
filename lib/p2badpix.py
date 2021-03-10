@@ -22,13 +22,13 @@ def badpix(eventname, cwd):
   """
 
   owd = os.getcwd()
-  os.chdir(cwd)
+
   tini = time.time()
 
   # Load the event
-  event = me.loadevent(eventname)
+  event = me.loadevent(os.path.join(cwd, eventname))
   # Load the data
-  me.updateevent(event, eventname, event.loadnext)
+  me.updateevent(event, os.path.join(cwd, eventname), event.loadnext)
 
   # Create a new log starting from the old one.
   oldlogname = event.logname
@@ -178,7 +178,7 @@ def badpix(eventname, cwd):
   else:
     todel = ['bdmskd']
 
-  me.saveevent(event, event.eventname + "_bpm", 
+  me.saveevent(event, os.path.join(event.topdir, event.eventname + "_bpm"),
             save=['data', 'uncd', 'mask'], delete=todel)
 
   # Print time elapsed and close log:
@@ -192,7 +192,7 @@ def badpix(eventname, cwd):
   dt = t.hms_time(time.time()-tini)
   log.writeclose('\nBad pixel masking time (h:m:s):  %s '%dt)
 
-  os.chdir(owd)
+  #os.chdir(owd)
 
   if event.runp3:
       #poet.p(3)

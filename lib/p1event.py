@@ -28,18 +28,17 @@ class Event(Univ):
   def __init__(self, eventpcf, cwd):
 
     owd = os.getcwd()
-    os.chdir(cwd)
-    print(os.chdir(cwd))
+    # os.chdir(cwd)
     tini = time.time()
 
     # Open new log based on the file name
-    logname = eventpcf[:-4] + "_ini.log"
+    logname = os.path.join(owd, cwd, eventpcf[:-4] + "_ini.log")
     log = le.Logedit(logname)
     self.logname = logname
 
     # initialize Univ
     Univ.__init__(self)
-    pcf, = rd.read_pcf(eventpcf, 'event', expand=False)
+    pcf, = rd.read_pcf(os.path.join(cwd, eventpcf), 'event', expand=False)
     self.initpars(pcf, log)
     self.calc(pcf, log)
     self.read(log)
@@ -59,8 +58,6 @@ class Event(Univ):
     dt = t.hms_time(time.time()-tini)
     log.writeclose('\nEnd init and read. Time (h:m:s):  %s'%dt)
 
-    os.chdir(owd)
-
     if self.runp2:
       os.system("python3 poet.py p2")
       #poet.poet("p2")
@@ -75,8 +72,8 @@ class Event(Univ):
     # Read Planet Parameters From TepFile
     # ccampo 5/27/2011:
     # origtep is a tepfile with its original units (not converted)
-    self.origtep      = tc.tepfile(os.path.relpath(pcf.tepfile[0]), conv=False)
-    tep               = tc.tepfile(pcf.tepfile[0])
+    self.origtep      = tc.tepfile(os.path.join(pcf.topdir[0], pcf.tepfile[0]), conv=False)
+    tep               = tc.tepfile(os.path.join(pcf.topdir[0], pcf.tepfile[0]))
     self.tep          = tep
     self.ra           = tep.ra.val
     self.dec          = tep.dec.val
@@ -139,9 +136,8 @@ class Event(Univ):
 
     # Directories
     self.topdir    = pcf.topdir[0]
-    self.datadir   = pcf.datadir[0]
-    self.dpref     = (self.datadir + '/' +
-                       self.sscver + '/r' )
+    self.datadir   = pcf.datadir[0].split('/')
+    self.dpref     = (os.path.join(self.topdir, *self.datadir, self.sscver, 'r' ))
 
     # aors
     self.aorname   = np.array(pcf.aorname, dtype=np.str_)# get aorname as string
@@ -159,18 +155,18 @@ class Event(Univ):
     self.runp3 = pcf.runp3[0]
 
     # Ancil files
-    self.hordir    = pcf.hordir[0]
-    self.leapdir   = pcf.leapdir[0]
-    self.kuruczdir = pcf.kuruczdir[0]
-    self.filtdir   = pcf.filtdir[0]
-    self.psfdir    = pcf.psfdir[0]
+    self.hordir    = pcf.hordir[0].split('/')
+    self.leapdir   = pcf.leapdir[0].split('/')
+    self.kuruczdir = pcf.kuruczdir[0].split('/')
+    self.filtdir   = pcf.filtdir[0].split('/')
+    self.psfdir    = pcf.psfdir[0].split('/')
 
     pmaskfile = pcf.pmaskfile[0]
-    self.pmaskfile  = [self.dpref + str(aorname) + self.inst.caldir + pmaskfile
+    self.pmaskfile  = [os.path.join(self.dpref+str(aorname), *self.inst.caldir.split('/'), pmaskfile)
                        for aorname in self.aorname[np.where(self.aortype == 0)]]
 
-    self.horvecfile = self.topdir + self.hordir    + pcf.horfile[0]
-    self.kuruczfile = self.topdir + self.kuruczdir + pcf.kuruczfile[0]
+    self.horvecfile = os.path.join(self.topdir, *self.hordir, pcf.horfile[0])
+    self.kuruczfile = os.path.join(self.topdir, *self.kuruczdir, pcf.kuruczfile[0])
 
     filt = pcf.filtfile
     if self.photchan < 5:
@@ -179,15 +175,14 @@ class Event(Univ):
       filt = filt[1]
     else: # self.photchan == 5:
       filt = filt[2]
-    self.filtfile   = self.topdir + self.filtdir + filt
+    self.filtfile   = os.path.join(self.topdir, *self.filtdir, filt)
 
     # Default PSF file:
     if self.photchan < 5  and pcf.psffile[0] == "default":
-      self.psffile = (self.topdir + self.psfdir + 'IRAC PSF/' + 
-                      'IRAC.%i.PRF.5X.070312.fits'%self.photchan )
+      self.psffile = os.path.join(self.topdir, *self.psfdir, 'IRAC PSF', 'IRAC.%i.PRF.5X.070312.fits'%self.photchan )
     # User specified PSF file: 
     else:
-      self.psffile =  self.topdir + self.psfdir + pcf.psffile[0]
+      self.psffile =  os.path.join(self.topdir, *self.psfdir, pcf.psffile[0])
 
     # Bad pixels:
     # Chunk size
@@ -219,7 +214,7 @@ class Event(Univ):
     # Name of the event
     comment = str(pcf.comment[0]) if pcf.comment[0] is not None else ''
     self.eventname = ( self.planet           + self.ecltype +
-                       np.str(self.photchan) + np.str(self.visit) +
+                       str(self.photchan) + str(self.visit) +
                        comment)
 
     # Added to check whether ancillary data files exist
@@ -437,7 +432,7 @@ class Event(Univ):
     plt.xlim(0,self.nx-0.5)
     plt.ylim(0,self.ny-0.5)
     plt.title(self.eventname + ' reference image')
-    plt.savefig(self.eventname + "-fig101.png")
+    plt.savefig(os.path.join(self.topdir, self.eventname + "-fig101.png"))
 
     # Throw a warning if the source estimate position lies outside of
     # the image.
@@ -494,9 +489,9 @@ class Event(Univ):
     
     if self.instrument == 'mips':
       self.loadnext.append('brmskd')
-      saveevent(self, self.eventname + "_ini",
+      saveevent(self, os.path.join(self.topdir, self.eventname + "_ini"),
                 save=['data', 'uncd', 'head', 'bdmskd', 'brmskd'])
     else:
-      saveevent(self, self.eventname + "_ini", delete=['brmskd'],
+      saveevent(self, os.path.join(self.topdir, self.eventname + "_ini"), delete=['brmskd'],
                 save=['data', 'uncd', 'head', 'bdmskd'])
 

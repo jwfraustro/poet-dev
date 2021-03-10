@@ -170,7 +170,7 @@ def denoise(pcf, denoisedir, owd):
     log = le.Logedit(denoisedir + "/" + logname, logname)
     log.writelog("\nStart " + denoisedir + " denoising: " + time.ctime())
 
-    os.chdir(denoisedir)
+    #os.chdir(denoisedir)
 
     # Parse the attributes from the control file to the event:
     attrib = vars(pcf)
@@ -246,7 +246,7 @@ def denoise(pcf, denoisedir, owd):
     log.writeclose("\nEnd Denoising. Time (h:m:s):  %s"%dt  +
                  "  (" + event.denoisedir + ")")
     print("-------------  ------------\n")
-    os.chdir(owd)
+    #os.chdir(owd)
     return
 
 
@@ -258,7 +258,7 @@ def run_denoising(eventname, cwd):
     """
 
     owd = os.getcwd()
-    os.chdir(cwd)
+    #os.chdir(cwd)
     config = os.path.basename(eventname)[:-4] + '.pcf'
     pcfs = rd.read_pcf(config, 'denoise')
     
@@ -272,7 +272,7 @@ def run_denoising(eventname, cwd):
         if cwd[-len(denoisedir):] == denoisedir:
             # Go to dir where poet2 files were saved.
             cwd = cwd[:-len(denoisedir)]
-            os.chdir(cwd)
+            #os.chdir(cwd)
     
     # Loop over each run:
 #    for run in np.arange(nruns):
@@ -312,5 +312,5 @@ def run_denoising(eventname, cwd):
         # Call denoising on each wavelet:
         denoise(pcf, denoisedir, owd)
     
-    os.chdir(owd)
+    #os.chdir(owd)
     return

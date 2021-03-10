@@ -193,7 +193,7 @@ def poet(func, *args, **kwargs):
         directory = os.path.relpath(os.path.join(rundir, args.pop(0)))
     else:
         directory = rundir
-    directory = os.path.abspath(directory)
+    directory = os.path.relpath(directory)
 
     # run POET
     if func == "p1":
@@ -206,32 +206,32 @@ def poet(func, *args, **kwargs):
         pd.run_denoising(eventname+'_bpm', directory, **kwargs)
 
     elif func == "p3":
-        if os.path.isfile(directory+'/'+eventname+'_den.dat'):
-            p3.run_centering(directory+'/'+eventname+'_den', directory,
+        if os.path.isfile(os.path.join(directory, eventname+'_den.dat')):
+            p3.run_centering(eventname+'_den', directory,
                              **kwargs)
-        elif os.path.isfile(directory+'/'+eventname+'_bpm.dat'):
-            p3.run_centering(directory+'/'+eventname+'_bpm', directory,
+        elif os.path.isfile(os.path.join(directory, eventname+'_bpm.dat')):
+            p3.run_centering(eventname+'_bpm', directory,
                              **kwargs)
         else:
             rootdir = os.path.dirname(directory)
-            if os.path.isfile(rootdir+'/'+eventname+'_den.dat'):
-                p3.run_centering(rootdir+'/'+eventname+'_den', directory,
+            if os.path.isfile(os.path.join(rootdir, eventname+'_den.dat')):
+                p3.run_centering(os.path.join(rootdir, eventname+'_den'), directory,
                                  **kwargs)
             else:
-                p3.run_centering(rootdir+'/'+eventname+'_bpm', directory,
+                p3.run_centering(os.path.join(rootdir, eventname+'_bpm'), directory,
                                  **kwargs)
 
     elif func == "p4":
-        if os.path.isfile(directory+'/'+eventname+'_ctr.dat'):
-            p4.run_photometry(directory+'/'+eventname+'_ctr', directory,
+        if os.path.isfile(os.path.join(directory, eventname+'_ctr.dat')):
+            p4.run_photometry(os.path.join(directory, eventname+'_ctr'), directory,
                               **kwargs)
         else:
             rootdir = os.path.dirname(directory)
-            p4.run_photometry(rootdir+'/'+eventname+'_ctr', directory,
+            p4.run_photometry(eventname+'_ctr', directory,
                               **kwargs)
 
     elif func == "p5":
-        p5.checks1(directory+'/'+eventname+'_pht', directory, *args, **kwargs)
+        p5.checks1(os.path.join(directory, eventname+'_pht'), directory, *args, **kwargs)
 
     elif func == "zen":
         if len(args) > 0:
@@ -246,7 +246,7 @@ def poet(func, *args, **kwargs):
 
         else:
             if "control" not in kwargs.keys():
-                kwargs["control"] = directory+'/'+eventname+'.pcf'
+                kwargs["control"] = os.path.join(directory, eventname+'.pcf')
 
             return run.p6model(None, directory, rundir=rundir, **kwargs)
 

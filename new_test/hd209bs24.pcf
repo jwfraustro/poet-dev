@@ -103,7 +103,7 @@ psfdir     ancil/psf/
 
 # ancil files
 #          irac                        irs              mips
-filtfile   irac_trCHAN_2004-08-09.dat  bluePUtrans.txt  mips24-resp.txt
+filtfile   irac_tr2_2004-08-09.dat  bluePUtrans.txt  mips24-resp.txt
 horfile    all_spitzer.vec
 
 [denoise]
@@ -215,7 +215,7 @@ modeldir   p6output          # optional
 # photometry combinations. If mcmc is used, each thread will use
 # 'nchains' cores, so be careful if running mcmc on several
 # cent/phot combinations.
-threads    1
+threads    4
 
 # alternatively, one can specify individual paths with
 # not yet implemented
@@ -228,7 +228,7 @@ threads    1
 # Note that not all options are listed in the default pcf files. Consult
 # the user manual for more advanced options.
 
-planetname      Example-b
+planetname      hd209-b
 
 # Name of file(s) containing initial parameter values
 modelfile       hd209bs24-initvals.txt # should have form 'wa012bs12-initvals.txt'

@@ -195,7 +195,7 @@ def checks2(filename, num):
 def checks1(eventname, cwd, period=None, ephtime=None):
 
   owd = os.getcwd()
-  os.chdir(cwd)
+  #os.chdir(cwd)
 
   # Load the Event
   event = me.loadevent(eventname)
@@ -213,7 +213,7 @@ def checks1(eventname, cwd, period=None, ephtime=None):
       os.mkdir("psffit/")
     except:
       pass
-    os.chdir("psffit/")
+    #os.chdir("psffit/")
 
   # Move frame parameters to fit Kevin's syntax:
   # event.fp.param --> event.param
@@ -648,7 +648,7 @@ def checks1(eventname, cwd, period=None, ephtime=None):
     log.writelog(" " + cwd + figname11)
   log.writeclose('\nEnd Checks: ' + time.ctime())
 
-  os.chdir(owd)
+  #os.chdir(owd)
 
   return event
 

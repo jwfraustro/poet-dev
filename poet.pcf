@@ -15,7 +15,7 @@ eventname hd209bs24
 memory  10240
 
 # the maximum number of CPUs to
-cores   10
+cores   4
 
 # Test centering and photometry. This centering and photometry will be used
 # to determine the best model.
@@ -28,7 +28,7 @@ p6model         mandelecl linramp bilinint
                 mandelecl bilinint
 
 # set True to run p6 automatically after running p1-5 (setting to False will automatically skip p7-10)
-runp6     True
+runp6     False
 
 # set True to run p7-10 automatically after running p6
 runp7_10 True
